@@ -3,6 +3,8 @@
 from app.core.interfaces import IMcpTool
 from app.features.video_generator.models import ChapterSection, VideoGenerationState
 from app.features.video_generator.skills.curriculum import CurriculumSkill
+from app.features.video_generator.skills.lesson_planning import LessonPlanningSkill
+from app.features.video_generator.skills.teacher import TeacherSkill
 
 
 class ParserAgent:
@@ -60,4 +62,62 @@ class CurriculumAgent:
         if not state.markdown_content:
             raise ValueError("Curriculum agent requires markdown_content from the Intake stage.")
         sections = await self._curriculum_skill.structure_chapter(state.markdown_content)
+        return {"sections": sections}
+
+
+class LessonPlanningAgent:
+    """Pedagogy-stage agent: paces concept sections for a Class 6 attention span."""
+
+    def __init__(self, lesson_planning_skill: LessonPlanningSkill) -> None:
+        """Create the agent with its injected Lesson Planning skill.
+
+        Args:
+            lesson_planning_skill: Skill that applies pacing and content-density constraints.
+        """
+        self._lesson_planning_skill = lesson_planning_skill
+
+    async def __call__(self, state: VideoGenerationState) -> dict[str, list[ChapterSection]]:
+        """Repace ``sections`` from the state's Curriculum-stage output.
+
+        Args:
+            state: Current shared pipeline state.
+
+        Returns:
+            Partial state update containing the paced concept sections.
+
+        Raises:
+            ValueError: If the Curriculum stage has not yet produced sections.
+        """
+        if not state.sections:
+            raise ValueError("Lesson Planning agent requires sections from the Curriculum stage.")
+        sections = await self._lesson_planning_skill.apply_pacing(state.sections)
+        return {"sections": sections}
+
+
+class TeacherAgent:
+    """Pedagogy-stage agent: rewrites concept sections into localized narration."""
+
+    def __init__(self, teacher_skill: TeacherSkill) -> None:
+        """Create the agent with its injected Teacher skill.
+
+        Args:
+            teacher_skill: Skill that converts scientific terms into localized language.
+        """
+        self._teacher_skill = teacher_skill
+
+    async def __call__(self, state: VideoGenerationState) -> dict[str, list[ChapterSection]]:
+        """Rewrite ``sections`` from the state's Lesson Planning-stage output.
+
+        Args:
+            state: Current shared pipeline state.
+
+        Returns:
+            Partial state update containing the localized narration sections.
+
+        Raises:
+            ValueError: If the Lesson Planning stage has not yet produced sections.
+        """
+        if not state.sections:
+            raise ValueError("Teacher agent requires sections from the Lesson Planning stage.")
+        sections = await self._teacher_skill.localize_sections(state.sections)
         return {"sections": sections}

@@ -3,9 +3,11 @@
 import pytest
 
 from app.core.interfaces import IMcpTool
-from app.features.video_generator.agents import CurriculumAgent, ParserAgent
+from app.features.video_generator.agents import CurriculumAgent, LessonPlanningAgent, ParserAgent, TeacherAgent
 from app.features.video_generator.models import ChapterSection, VideoGenerationState
 from app.features.video_generator.skills.curriculum import CurriculumSkill
+from app.features.video_generator.skills.lesson_planning import LessonPlanningSkill
+from app.features.video_generator.skills.teacher import TeacherSkill
 from tests.conftest import FakeLlmProvider
 
 
@@ -52,4 +54,42 @@ async def test_curriculum_agent_requires_markdown_content() -> None:
     state = VideoGenerationState(file_path="x.pdf")
 
     with pytest.raises(ValueError, match="markdown_content"):
+        await agent(state)
+
+
+async def test_lesson_planning_agent_returns_paced_sections() -> None:
+    """The agent maps the Lesson Planning skill's result onto the sections state field."""
+    agent = LessonPlanningAgent(LessonPlanningSkill(FakeLlmProvider()))
+    state = VideoGenerationState(file_path="x.pdf", sections=[ChapterSection(title="Raw", content="Raw content.")])
+
+    update = await agent(state)
+
+    assert update == {"sections": [ChapterSection(title="Mock Section", content="Mock content.")]}
+
+
+async def test_lesson_planning_agent_requires_sections() -> None:
+    """The agent fails explicitly when the Curriculum stage has not run yet."""
+    agent = LessonPlanningAgent(LessonPlanningSkill(FakeLlmProvider()))
+    state = VideoGenerationState(file_path="x.pdf")
+
+    with pytest.raises(ValueError, match="Curriculum stage"):
+        await agent(state)
+
+
+async def test_teacher_agent_returns_localized_sections() -> None:
+    """The agent maps the Teacher skill's result onto the sections state field."""
+    agent = TeacherAgent(TeacherSkill(FakeLlmProvider()))
+    state = VideoGenerationState(file_path="x.pdf", sections=[ChapterSection(title="Paced", content="Paced content.")])
+
+    update = await agent(state)
+
+    assert update == {"sections": [ChapterSection(title="Mock Section", content="Mock content.")]}
+
+
+async def test_teacher_agent_requires_sections() -> None:
+    """The agent fails explicitly when the Lesson Planning stage has not run yet."""
+    agent = TeacherAgent(TeacherSkill(FakeLlmProvider()))
+    state = VideoGenerationState(file_path="x.pdf")
+
+    with pytest.raises(ValueError, match="Lesson Planning stage"):
         await agent(state)

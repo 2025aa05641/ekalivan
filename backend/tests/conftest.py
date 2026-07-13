@@ -4,6 +4,7 @@ import asyncio
 from collections.abc import AsyncIterator
 
 import pytest_asyncio
+from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
@@ -62,16 +63,28 @@ async def session_factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
 
 
 @pytest_asyncio.fixture
-async def client(session_factory: async_sessionmaker[AsyncSession]) -> AsyncIterator[AsyncClient]:
+async def test_app(session_factory: async_sessionmaker[AsyncSession]) -> FastAPI:
+    """Build the isolated application instance used by ``client``.
+
+    Exposed as its own fixture so tests can await ``test_app.state.background_tasks``
+    directly instead of guessing at a wall-clock polling budget.
+
+    Returns:
+        FastAPI application wired to fast, deterministic Intake/Pedagogy stand-ins.
+    """
+    return create_app(session_factory=session_factory, parser_tool=FakeParserTool(), llm_provider=FakeLlmProvider())
+
+
+@pytest_asyncio.fixture
+async def client(test_app: FastAPI) -> AsyncIterator[AsyncClient]:
     """Create an API client connected to the test database.
 
     Yields:
         HTTP client configured with the isolated application instance.
     """
-    app = create_app(session_factory=session_factory, parser_tool=FakeParserTool(), llm_provider=FakeLlmProvider())
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as test_client:
+    async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as test_client:
         yield test_client
-    background_tasks: set[asyncio.Task[None]] = app.state.background_tasks
+    background_tasks: set[asyncio.Task[None]] = test_app.state.background_tasks
     for task in background_tasks:
         task.cancel()
     if background_tasks:

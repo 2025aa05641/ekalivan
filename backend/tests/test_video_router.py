@@ -1,38 +1,41 @@
 """Video-generation API integration tests."""
 
 import asyncio
-import time
 from uuid import UUID
 
+from fastapi import FastAPI
 from httpx import AsyncClient
 
 from tests.conftest import FAILURE_SENTINEL_PATH
 
-_POLL_TIMEOUT_SECONDS = 15.0
-_POLL_INTERVAL_SECONDS = 0.02
+_BACKGROUND_TASK_SAFETY_TIMEOUT_SECONDS = 30.0
 
 
-async def _wait_for_terminal_status(client: AsyncClient, task_id: str) -> dict[str, object]:
-    """Poll a job until it leaves QUEUED/PROCESSING or a wall-clock budget is exhausted.
+async def _await_generation_and_fetch_status(client: AsyncClient, app: FastAPI, task_id: str) -> dict[str, object]:
+    """Await the job's background pipeline task directly, then fetch its final status.
+
+    Awaiting the task itself (instead of polling with a wall-clock budget) makes the
+    test deterministic regardless of how slowly the pipeline happens to be scheduled.
 
     Returns:
-        The job status payload once it reaches a terminal status.
+        The job status payload once its background task has finished.
 
     Raises:
-        AssertionError: If the job does not reach a terminal status in time.
+        AssertionError: If no background task is registered for the job.
     """
-    deadline = time.monotonic() + _POLL_TIMEOUT_SECONDS
-    while time.monotonic() < deadline:
-        response = await client.get(f"/api/v1/videos/{task_id}")
-        payload: dict[str, object] = response.json()
-        if payload["status"] not in {"QUEUED", "PROCESSING"}:
-            return payload
-        await asyncio.sleep(_POLL_INTERVAL_SECONDS)
-    raise AssertionError(f"Job {task_id} did not reach a terminal status within {_POLL_TIMEOUT_SECONDS}s.")
+    background_tasks: set[asyncio.Task[None]] = app.state.background_tasks
+    if not background_tasks:
+        raise AssertionError(f"No background task was scheduled for job {task_id}.")
+    await asyncio.wait_for(
+        asyncio.gather(*background_tasks, return_exceptions=True), timeout=_BACKGROUND_TASK_SAFETY_TIMEOUT_SECONDS
+    )
+    response = await client.get(f"/api/v1/videos/{task_id}")
+    payload: dict[str, object] = response.json()
+    return payload
 
 
-async def test_generate_and_read_job_status(client: AsyncClient) -> None:
-    """The API creates a queued job and advances it through Intake and Curriculum."""
+async def test_generate_and_read_job_status(client: AsyncClient, test_app: FastAPI) -> None:
+    """The API creates a queued job and advances it through Intake and the Pedagogy stages."""
     response = await client.post(
         "/api/v1/videos/generate",
         json={
@@ -48,14 +51,14 @@ async def test_generate_and_read_job_status(client: AsyncClient) -> None:
     assert UUID(payload["task_id"])
     assert payload["status"] == "QUEUED"
 
-    completed_payload = await _wait_for_terminal_status(client, payload["task_id"])
+    completed_payload = await _await_generation_and_fetch_status(client, test_app, payload["task_id"])
     assert completed_payload["status"] == "COMPLETED"
     assert "Mock Markdown" in str(completed_payload["markdown_content"])
     assert completed_payload["sections"] == [{"title": "Mock Section", "content": "Mock content."}]
     assert completed_payload["error_message"] is None
 
 
-async def test_generate_records_pipeline_failure(client: AsyncClient) -> None:
+async def test_generate_records_pipeline_failure(client: AsyncClient, test_app: FastAPI) -> None:
     """A pipeline failure is recorded on the job instead of crashing the worker."""
     response = await client.post(
         "/api/v1/videos/generate",
@@ -68,7 +71,7 @@ async def test_generate_records_pipeline_failure(client: AsyncClient) -> None:
     )
     payload = response.json()
 
-    failed_payload = await _wait_for_terminal_status(client, payload["task_id"])
+    failed_payload = await _await_generation_and_fetch_status(client, test_app, payload["task_id"])
     assert failed_payload["status"] == "FAILED"
     assert failed_payload["markdown_content"] is None
     assert failed_payload["sections"] is None

@@ -41,7 +41,7 @@ async def run_video_generation_pipeline(
     task_id: UUID,
     graph: CompiledStateGraph[VideoGenerationState],
 ) -> None:
-    """Advance a job through the Intake and Curriculum stages of the generation graph.
+    """Advance a job through the Intake and Pedagogy stages of the generation graph.
 
     Args:
         session_factory: Factory that provides isolated background-task sessions.

@@ -2,11 +2,11 @@
 
 from pathlib import Path
 
-import yaml
 from pydantic import BaseModel, Field
 
 from app.core.interfaces import ILlmProvider
 from app.features.video_generator.models import ChapterSection
+from app.features.video_generator.skills.prompt_template import PromptTemplate
 
 _DEFAULT_PROMPT_PATH = Path(__file__).parent / "prompts" / "curriculum.yaml"
 
@@ -28,9 +28,7 @@ class CurriculumSkill:
             prompt_path: Path to the YAML file holding the ``system``/``template`` prompt parts.
         """
         self._llm_provider = llm_provider
-        prompt_config = yaml.safe_load(prompt_path.read_text(encoding="utf-8"))
-        self._system_prompt: str = prompt_config["system"]
-        self._template: str = prompt_config["template"]
+        self._prompt = PromptTemplate(prompt_path)
 
     async def structure_chapter(self, markdown_content: str) -> list[ChapterSection]:
         """Structure chapter Markdown into an ordered list of concept sections.
@@ -41,6 +39,6 @@ class CurriculumSkill:
         Returns:
             Concept sections in chapter order.
         """
-        prompt = f"{self._system_prompt}\n\n{self._template.format(markdown_content=markdown_content)}"
+        prompt = self._prompt.render(markdown_content=markdown_content)
         response = await self._llm_provider.complete(prompt, CurriculumResponse)
         return response.sections
