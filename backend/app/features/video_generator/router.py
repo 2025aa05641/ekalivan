@@ -5,6 +5,7 @@ from collections.abc import Coroutine
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, status
+from langgraph.graph.state import CompiledStateGraph
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.dependencies import get_db_session
@@ -13,6 +14,7 @@ from app.features.video_generator.models import (
     JobStatusResponse,
     VideoGenerationRequest,
     VideoGenerationResponse,
+    VideoGenerationState,
     VideoTaskStatus,
 )
 from app.features.video_generator.repository import VideoJobRepository
@@ -33,34 +35,41 @@ def get_video_service(session: AsyncSession = Depends(get_db_session)) -> VideoG
     return VideoGenerationService(VideoJobRepository(session))
 
 
-async def mock_video_generation(
+async def run_video_generation_pipeline(
     session_factory: async_sessionmaker[AsyncSession],
     task_id: UUID,
-    delay_seconds: float,
+    graph: CompiledStateGraph[VideoGenerationState],
 ) -> None:
-    """Advance a job through the temporary mock generation lifecycle.
+    """Advance a job through the Intake stage of the generation graph.
 
     Args:
         session_factory: Factory that provides isolated background-task sessions.
-        task_id: Job to advance through the lifecycle.
-        delay_seconds: Delay between status transitions.
+        task_id: Job to advance through the pipeline.
+        graph: Compiled LangGraph pipeline to invoke against the job's state.
     """
     async with session_factory() as session:
         repository = VideoJobRepository(session)
-        await asyncio.sleep(delay_seconds)
-        updated = await repository.update_status(task_id, VideoTaskStatus.PROCESSING)
-        if updated is None:
+        job = await repository.update_status(task_id, VideoTaskStatus.PROCESSING)
+        if job is None:
             return
-        await asyncio.sleep(delay_seconds)
-        await repository.update_status(task_id, VideoTaskStatus.COMPLETED)
+        try:
+            raw_result = await graph.ainvoke(VideoGenerationState(file_path=job.file_storage_path))
+            result = VideoGenerationState.model_validate(raw_result)
+        except Exception as exc:
+            await repository.mark_failed(task_id, str(exc))
+            return
+        if result.markdown_content is None:
+            await repository.mark_failed(task_id, "Pipeline completed without producing Markdown content.")
+            return
+        await repository.mark_completed(task_id, result.markdown_content)
 
 
 def schedule_background_task(app: Request, coroutine: Coroutine[object, object, None]) -> None:
-    """Schedule and retain a mock background task for the application lifespan.
+    """Schedule and retain a background task for the application lifespan.
 
     Args:
         app: Request used to access application state.
-        coroutine: Coroutine that runs the mock status lifecycle.
+        coroutine: Coroutine that runs the generation pipeline.
     """
     task = asyncio.create_task(coroutine)
     app.app.state.background_tasks.add(task)
@@ -73,7 +82,7 @@ async def generate_video(
     request: Request,
     service: VideoGenerationService = Depends(get_video_service),
 ) -> VideoGenerationResponse:
-    """Persist a queued video job and start its mock background lifecycle.
+    """Persist a queued video job and start its background generation pipeline.
 
     Args:
         payload: Validated chapter details.
@@ -86,7 +95,9 @@ async def generate_video(
     job = await service.create_job(payload)
     schedule_background_task(
         request,
-        mock_video_generation(request.app.state.session_factory, job.id, request.app.state.mock_job_delay_seconds),
+        run_video_generation_pipeline(
+            request.app.state.session_factory, job.id, request.app.state.video_generation_graph
+        ),
     )
     return VideoGenerationResponse(task_id=job.id, status=VideoTaskStatus(job.status))
 
@@ -103,7 +114,7 @@ async def get_video_job_status(
         service: Injected job service.
 
     Returns:
-        UUID and current job status.
+        UUID, current status, and any Intake-stage result or failure detail.
 
     Raises:
         TaskNotFoundError: If the requested job does not exist.
@@ -111,4 +122,9 @@ async def get_video_job_status(
     job = await service.get_job(task_id)
     if job is None:
         raise TaskNotFoundError(str(task_id))
-    return JobStatusResponse(task_id=job.id, status=VideoTaskStatus(job.status))
+    return JobStatusResponse(
+        task_id=job.id,
+        status=VideoTaskStatus(job.status),
+        markdown_content=job.markdown_content,
+        error_message=job.error_message,
+    )

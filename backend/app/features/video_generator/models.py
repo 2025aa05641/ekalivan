@@ -24,6 +24,7 @@ class VideoGenerationRequest(BaseModel):
     class_level: NonBlankString
     subject: NonBlankString
     chapter_title: NonBlankString
+    file_storage_path: NonBlankString
 
 
 class VideoGenerationResponse(BaseModel):
@@ -38,6 +39,8 @@ class JobStatusResponse(BaseModel):
 
     task_id: UUID
     status: VideoTaskStatus
+    markdown_content: str | None = None
+    error_message: str | None = None
 
 
 class ChapterSection(BaseModel):

@@ -30,7 +30,7 @@ class VideoGenerationService:
         Raises:
             ValueError: If any required input is empty after normalization.
         """
-        if not all((request.class_level, request.subject, request.chapter_title)):
+        if not all((request.class_level, request.subject, request.chapter_title, request.file_storage_path)):
             raise ValueError("Video generation fields must not be empty.")
         return await self._repository.create_job(request)
 

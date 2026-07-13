@@ -7,8 +7,26 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
+from app.core.interfaces import IMcpTool
 from app.infrastructure.database import Base
 from app.main import create_app
+
+FAILURE_SENTINEL_PATH = "trigger-parser-error.pdf"
+
+
+class FakeParserTool(IMcpTool):
+    """Fast, deterministic Intake-stage stand-in for API-level tests."""
+
+    async def execute(self, **kwargs: object) -> object:
+        """Return deterministic Markdown, or raise for the failure sentinel path.
+
+        Raises:
+            RuntimeError: If ``file_path`` equals ``FAILURE_SENTINEL_PATH``.
+        """
+        file_path = kwargs["file_path"]
+        if file_path == FAILURE_SENTINEL_PATH:
+            raise RuntimeError("Simulated parser failure.")
+        return f"# Mock Markdown\n\nParsed content for {file_path}."
 
 
 @pytest_asyncio.fixture
@@ -34,7 +52,7 @@ async def client(session_factory: async_sessionmaker[AsyncSession]) -> AsyncIter
     Yields:
         HTTP client configured with the isolated application instance.
     """
-    app = create_app(session_factory=session_factory, mock_job_delay_seconds=0.01)
+    app = create_app(session_factory=session_factory, parser_tool=FakeParserTool())
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as test_client:
         yield test_client
     background_tasks: set[asyncio.Task[None]] = app.state.background_tasks

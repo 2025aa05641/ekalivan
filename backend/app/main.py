@@ -11,7 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.core.config import get_settings
 from app.core.errors import register_exception_handlers
+from app.core.interfaces import IMcpTool
 from app.core.logging import configure_logging
+from app.features.video_generator.graph import build_video_generation_graph
+from app.features.video_generator.mcp_tools import MarkItDownTool
 from app.features.video_generator.router import router as video_generator_router
 from app.infrastructure.database import create_engine, create_session_factory
 
@@ -37,9 +40,14 @@ def create_app(
     *,
     engine: AsyncEngine | None = None,
     session_factory: async_sessionmaker[AsyncSession] | None = None,
-    mock_job_delay_seconds: float = 5.0,
+    parser_tool: IMcpTool | None = None,
 ) -> FastAPI:
     """Build the configured API application for production or test use.
+
+    Args:
+        engine: Async engine to use in place of one built from settings.
+        session_factory: Session factory to use in place of one built from ``engine``.
+        parser_tool: Intake-stage MCP tool to use in place of ``MarkItDownTool``.
 
     Returns:
         Fully configured FastAPI application.
@@ -49,7 +57,7 @@ def create_app(
     app.state.engine = engine or create_engine(settings.database_url)
     app.state.owns_engine = engine is None
     app.state.session_factory = session_factory or create_session_factory(app.state.engine)
-    app.state.mock_job_delay_seconds = mock_job_delay_seconds
+    app.state.video_generation_graph = build_video_generation_graph(parser_tool or MarkItDownTool())
     app.state.background_tasks = set()
     app.add_middleware(
         CORSMiddleware,
