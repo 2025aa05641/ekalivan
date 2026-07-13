@@ -5,7 +5,12 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.features.video_generator.db_models import VideoJob
-from app.features.video_generator.models import ChapterSection, VideoGenerationRequest, VideoTaskStatus
+from app.features.video_generator.models import (
+    ChapterSection,
+    ScriptBeat,
+    VideoGenerationRequest,
+    VideoTaskStatus,
+)
 
 
 class VideoJobRepository:
@@ -70,14 +75,19 @@ class VideoJobRepository:
         return job
 
     async def mark_completed(
-        self, task_id: UUID, markdown_content: str, sections: list[ChapterSection]
+        self,
+        task_id: UUID,
+        markdown_content: str,
+        sections: list[ChapterSection],
+        storyboard_beats: list[ScriptBeat],
     ) -> VideoJob | None:
         """Record a successful pipeline result and complete the job.
 
         Args:
             task_id: Video-generation job UUID.
             markdown_content: Markdown produced by the Parser agent.
-            sections: Concept sections produced by the Curriculum agent.
+            sections: Concept sections produced by the Teacher agent.
+            storyboard_beats: Timed scene beats produced by the Storyboard agent.
 
         Returns:
             Updated job, or ``None`` when the job does not exist.
@@ -88,6 +98,7 @@ class VideoJobRepository:
         job.status = VideoTaskStatus.COMPLETED.value
         job.markdown_content = markdown_content
         job.sections = [section.model_dump() for section in sections]
+        job.storyboard_beats = [beat.model_dump() for beat in storyboard_beats]
         await self._session.commit()
         await self._session.refresh(job)
         return job

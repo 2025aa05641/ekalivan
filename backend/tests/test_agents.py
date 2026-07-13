@@ -3,10 +3,17 @@
 import pytest
 
 from app.core.interfaces import IMcpTool
-from app.features.video_generator.agents import CurriculumAgent, LessonPlanningAgent, ParserAgent, TeacherAgent
-from app.features.video_generator.models import ChapterSection, VideoGenerationState
+from app.features.video_generator.agents import (
+    CurriculumAgent,
+    LessonPlanningAgent,
+    ParserAgent,
+    StoryboardAgent,
+    TeacherAgent,
+)
+from app.features.video_generator.models import ChapterSection, ScriptBeat, VideoGenerationState
 from app.features.video_generator.skills.curriculum import CurriculumSkill
 from app.features.video_generator.skills.lesson_planning import LessonPlanningSkill
+from app.features.video_generator.skills.storyboard import StoryboardSkill
 from app.features.video_generator.skills.teacher import TeacherSkill
 from tests.conftest import FakeLlmProvider
 
@@ -92,4 +99,29 @@ async def test_teacher_agent_requires_sections() -> None:
     state = VideoGenerationState(file_path="x.pdf")
 
     with pytest.raises(ValueError, match="Lesson Planning stage"):
+        await agent(state)
+
+
+async def test_storyboard_agent_returns_beats() -> None:
+    """The agent maps the Storyboard skill's result onto the storyboard_beats state field."""
+    agent = StoryboardAgent(StoryboardSkill(FakeLlmProvider()))
+    state = VideoGenerationState(
+        file_path="x.pdf", sections=[ChapterSection(title="Localized", content="Localized content.")]
+    )
+
+    update = await agent(state)
+
+    assert update == {
+        "storyboard_beats": [
+            ScriptBeat(narration="Mock narration.", visual_prompt="Mock visual.", duration_seconds=5.0)
+        ]
+    }
+
+
+async def test_storyboard_agent_requires_sections() -> None:
+    """The agent fails explicitly when the Teacher stage has not run yet."""
+    agent = StoryboardAgent(StoryboardSkill(FakeLlmProvider()))
+    state = VideoGenerationState(file_path="x.pdf")
+
+    with pytest.raises(ValueError, match="Teacher stage"):
         await agent(state)

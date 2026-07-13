@@ -1,9 +1,10 @@
 """LangGraph agent nodes for the video-generation pipeline."""
 
 from app.core.interfaces import IMcpTool
-from app.features.video_generator.models import ChapterSection, VideoGenerationState
+from app.features.video_generator.models import ChapterSection, ScriptBeat, VideoGenerationState
 from app.features.video_generator.skills.curriculum import CurriculumSkill
 from app.features.video_generator.skills.lesson_planning import LessonPlanningSkill
+from app.features.video_generator.skills.storyboard import StoryboardSkill
 from app.features.video_generator.skills.teacher import TeacherSkill
 
 
@@ -121,3 +122,32 @@ class TeacherAgent:
             raise ValueError("Teacher agent requires sections from the Lesson Planning stage.")
         sections = await self._teacher_skill.localize_sections(state.sections)
         return {"sections": sections}
+
+
+class StoryboardAgent:
+    """Storyboarding-stage agent: turns narration sections into timed scene beats."""
+
+    def __init__(self, storyboard_skill: StoryboardSkill) -> None:
+        """Create the agent with its injected Storyboard skill.
+
+        Args:
+            storyboard_skill: Skill that produces per-scene visual prompts and timing.
+        """
+        self._storyboard_skill = storyboard_skill
+
+    async def __call__(self, state: VideoGenerationState) -> dict[str, list[ScriptBeat]]:
+        """Populate ``storyboard_beats`` from the state's Teacher-stage output.
+
+        Args:
+            state: Current shared pipeline state.
+
+        Returns:
+            Partial state update containing the timed storyboard beats.
+
+        Raises:
+            ValueError: If the Teacher stage has not yet produced sections.
+        """
+        if not state.sections:
+            raise ValueError("Storyboard agent requires sections from the Teacher stage.")
+        storyboard_beats = await self._storyboard_skill.create_storyboard(state.sections)
+        return {"storyboard_beats": storyboard_beats}

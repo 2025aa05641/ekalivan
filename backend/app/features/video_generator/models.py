@@ -41,6 +41,14 @@ class ChapterSection(BaseModel):
     content: NonBlankString
 
 
+class ScriptBeat(BaseModel):
+    """Timed storyboard beat produced by the storyboarding stage."""
+
+    narration: NonBlankString
+    visual_prompt: NonBlankString
+    duration_seconds: float = Field(gt=0)
+
+
 class JobStatusResponse(BaseModel):
     """Current status response for a persisted video-generation job."""
 
@@ -48,15 +56,8 @@ class JobStatusResponse(BaseModel):
     status: VideoTaskStatus
     markdown_content: str | None = None
     sections: list[ChapterSection] | None = None
+    storyboard_beats: list[ScriptBeat] | None = None
     error_message: str | None = None
-
-
-class ScriptBeat(BaseModel):
-    """Timed storyboard beat produced by the storyboarding stage."""
-
-    narration: NonBlankString
-    visual_prompt: NonBlankString
-    duration_seconds: float = Field(gt=0)
 
 
 class VideoGenerationState(BaseModel):

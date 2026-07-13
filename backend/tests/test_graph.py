@@ -13,8 +13,8 @@ class _StubParserTool(IMcpTool):
         return f"# Parsed: {kwargs['file_path']}"
 
 
-async def test_graph_invocation_runs_intake_then_pedagogy_stages() -> None:
-    """Invoking the compiled graph runs Parser, Curriculum, Lesson Planning, then Teacher in order."""
+async def test_graph_invocation_runs_full_wired_chain() -> None:
+    """Invoking the compiled graph runs Parser, Pedagogy, then Storyboard agents in order."""
     graph = build_video_generation_graph(_StubParserTool(), FakeLlmProvider())
 
     raw_result = await graph.ainvoke(VideoGenerationState(file_path="chapter.pdf"))
@@ -22,3 +22,4 @@ async def test_graph_invocation_runs_intake_then_pedagogy_stages() -> None:
 
     assert result.markdown_content == "# Parsed: chapter.pdf"
     assert result.sections[0].title == "Mock Section"
+    assert result.storyboard_beats[0].narration == "Mock narration."

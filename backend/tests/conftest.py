@@ -31,19 +31,33 @@ class FakeParserTool(IMcpTool):
 
 
 class FakeLlmProvider(ILlmProvider):
-    """Deterministic Curriculum-shaped LLM stand-in shared across skill, agent, and API tests."""
+    """Deterministic LLM stand-in shared across skill, agent, and API tests.
+
+    Recognizes the two response shapes the pipeline's Skills currently use
+    (``sections`` and ``beats``) and returns a canned, schema-valid value for
+    whichever one is requested.
+    """
 
     def __init__(self) -> None:
         self.last_prompt: str | None = None
 
     async def complete(self, prompt: str, response_schema: type[ResponseModel]) -> ResponseModel:
-        """Record the assembled prompt and return a schema-valid single-section response.
+        """Record the assembled prompt and return a schema-valid canned response.
 
         Returns:
-            A ``response_schema`` instance with one mock section.
+            A ``response_schema`` instance with one mock section or scene beat.
+
+        Raises:
+            ValueError: If ``response_schema`` is not a recognized shape.
         """
         self.last_prompt = prompt
-        return response_schema.model_validate({"sections": [{"title": "Mock Section", "content": "Mock content."}]})
+        if "sections" in response_schema.model_fields:
+            return response_schema.model_validate({"sections": [{"title": "Mock Section", "content": "Mock content."}]})
+        if "beats" in response_schema.model_fields:
+            return response_schema.model_validate(
+                {"beats": [{"narration": "Mock narration.", "visual_prompt": "Mock visual.", "duration_seconds": 5.0}]}
+            )
+        raise ValueError(f"FakeLlmProvider does not recognize response schema '{response_schema.__name__}'.")
 
 
 @pytest_asyncio.fixture

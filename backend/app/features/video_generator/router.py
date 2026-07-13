@@ -13,6 +13,7 @@ from app.core.errors import TaskNotFoundError
 from app.features.video_generator.models import (
     ChapterSection,
     JobStatusResponse,
+    ScriptBeat,
     VideoGenerationRequest,
     VideoGenerationResponse,
     VideoGenerationState,
@@ -41,7 +42,7 @@ async def run_video_generation_pipeline(
     task_id: UUID,
     graph: CompiledStateGraph[VideoGenerationState],
 ) -> None:
-    """Advance a job through the Intake and Pedagogy stages of the generation graph.
+    """Advance a job through the Intake, Pedagogy, and Storyboarding stages of the generation graph.
 
     Args:
         session_factory: Factory that provides isolated background-task sessions.
@@ -59,10 +60,10 @@ async def run_video_generation_pipeline(
         except Exception as exc:
             await repository.mark_failed(task_id, str(exc))
             return
-        if result.markdown_content is None or not result.sections:
+        if result.markdown_content is None or not result.sections or not result.storyboard_beats:
             await repository.mark_failed(task_id, "Pipeline completed without producing the expected content.")
             return
-        await repository.mark_completed(task_id, result.markdown_content, result.sections)
+        await repository.mark_completed(task_id, result.markdown_content, result.sections, result.storyboard_beats)
 
 
 def schedule_background_task(app: Request, coroutine: Coroutine[object, object, None]) -> None:
@@ -124,10 +125,14 @@ async def get_video_job_status(
     if job is None:
         raise TaskNotFoundError(str(task_id))
     sections = [ChapterSection.model_validate(section) for section in job.sections] if job.sections else None
+    storyboard_beats = (
+        [ScriptBeat.model_validate(beat) for beat in job.storyboard_beats] if job.storyboard_beats else None
+    )
     return JobStatusResponse(
         task_id=job.id,
         status=VideoTaskStatus(job.status),
         markdown_content=job.markdown_content,
         sections=sections,
+        storyboard_beats=storyboard_beats,
         error_message=job.error_message,
     )
