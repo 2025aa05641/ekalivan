@@ -7,7 +7,7 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
-from app.core.interfaces import IMcpTool
+from app.core.interfaces import ILlmProvider, IMcpTool, ResponseModel
 from app.infrastructure.database import Base
 from app.main import create_app
 
@@ -27,6 +27,22 @@ class FakeParserTool(IMcpTool):
         if file_path == FAILURE_SENTINEL_PATH:
             raise RuntimeError("Simulated parser failure.")
         return f"# Mock Markdown\n\nParsed content for {file_path}."
+
+
+class FakeLlmProvider(ILlmProvider):
+    """Deterministic Curriculum-shaped LLM stand-in shared across skill, agent, and API tests."""
+
+    def __init__(self) -> None:
+        self.last_prompt: str | None = None
+
+    async def complete(self, prompt: str, response_schema: type[ResponseModel]) -> ResponseModel:
+        """Record the assembled prompt and return a schema-valid single-section response.
+
+        Returns:
+            A ``response_schema`` instance with one mock section.
+        """
+        self.last_prompt = prompt
+        return response_schema.model_validate({"sections": [{"title": "Mock Section", "content": "Mock content."}]})
 
 
 @pytest_asyncio.fixture
@@ -52,7 +68,7 @@ async def client(session_factory: async_sessionmaker[AsyncSession]) -> AsyncIter
     Yields:
         HTTP client configured with the isolated application instance.
     """
-    app = create_app(session_factory=session_factory, parser_tool=FakeParserTool())
+    app = create_app(session_factory=session_factory, parser_tool=FakeParserTool(), llm_provider=FakeLlmProvider())
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as test_client:
         yield test_client
     background_tasks: set[asyncio.Task[None]] = app.state.background_tasks

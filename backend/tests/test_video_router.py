@@ -32,7 +32,7 @@ async def _wait_for_terminal_status(client: AsyncClient, task_id: str) -> dict[s
 
 
 async def test_generate_and_read_job_status(client: AsyncClient) -> None:
-    """The API creates a queued job and advances it through the Intake stage."""
+    """The API creates a queued job and advances it through Intake and Curriculum."""
     response = await client.post(
         "/api/v1/videos/generate",
         json={
@@ -51,6 +51,7 @@ async def test_generate_and_read_job_status(client: AsyncClient) -> None:
     completed_payload = await _wait_for_terminal_status(client, payload["task_id"])
     assert completed_payload["status"] == "COMPLETED"
     assert "Mock Markdown" in str(completed_payload["markdown_content"])
+    assert completed_payload["sections"] == [{"title": "Mock Section", "content": "Mock content."}]
     assert completed_payload["error_message"] is None
 
 
@@ -70,6 +71,7 @@ async def test_generate_records_pipeline_failure(client: AsyncClient) -> None:
     failed_payload = await _wait_for_terminal_status(client, payload["task_id"])
     assert failed_payload["status"] == "FAILED"
     assert failed_payload["markdown_content"] is None
+    assert failed_payload["sections"] is None
     assert "Simulated parser failure" in str(failed_payload["error_message"])
 
 

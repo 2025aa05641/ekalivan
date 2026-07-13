@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.core.dependencies import get_db_session
 from app.core.errors import TaskNotFoundError
 from app.features.video_generator.models import (
+    ChapterSection,
     JobStatusResponse,
     VideoGenerationRequest,
     VideoGenerationResponse,
@@ -40,7 +41,7 @@ async def run_video_generation_pipeline(
     task_id: UUID,
     graph: CompiledStateGraph[VideoGenerationState],
 ) -> None:
-    """Advance a job through the Intake stage of the generation graph.
+    """Advance a job through the Intake and Curriculum stages of the generation graph.
 
     Args:
         session_factory: Factory that provides isolated background-task sessions.
@@ -58,10 +59,10 @@ async def run_video_generation_pipeline(
         except Exception as exc:
             await repository.mark_failed(task_id, str(exc))
             return
-        if result.markdown_content is None:
-            await repository.mark_failed(task_id, "Pipeline completed without producing Markdown content.")
+        if result.markdown_content is None or not result.sections:
+            await repository.mark_failed(task_id, "Pipeline completed without producing the expected content.")
             return
-        await repository.mark_completed(task_id, result.markdown_content)
+        await repository.mark_completed(task_id, result.markdown_content, result.sections)
 
 
 def schedule_background_task(app: Request, coroutine: Coroutine[object, object, None]) -> None:
@@ -122,9 +123,11 @@ async def get_video_job_status(
     job = await service.get_job(task_id)
     if job is None:
         raise TaskNotFoundError(str(task_id))
+    sections = [ChapterSection.model_validate(section) for section in job.sections] if job.sections else None
     return JobStatusResponse(
         task_id=job.id,
         status=VideoTaskStatus(job.status),
         markdown_content=job.markdown_content,
+        sections=sections,
         error_message=job.error_message,
     )

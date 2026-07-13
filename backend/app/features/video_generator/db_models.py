@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, String, Text, func
+from sqlalchemy import JSON, DateTime, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import Uuid
 
@@ -22,6 +22,7 @@ class VideoJob(Base):
     file_storage_path: Mapped[str] = mapped_column(String(512), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="QUEUED")
     markdown_content: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    sections: Mapped[list[dict[str, str]] | None] = mapped_column(JSON(), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text(), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

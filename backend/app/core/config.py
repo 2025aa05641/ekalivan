@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     allowed_origins: str = "http://localhost:3000,http://localhost:8080"
     static_assets_path: str = "rendered"
     database_url: str = "postgresql+asyncpg://textbook_video:textbook_video@localhost:5432/textbook_video"
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "llama3.1"
+    ollama_timeout_seconds: float = Field(default=120.0, gt=0)
 
     @property
     def cors_origins(self) -> list[str]:

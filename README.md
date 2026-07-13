@@ -22,11 +22,15 @@ This repository contains the Sprint 0 foundation for the platform defined in the
 - `frontend/`: Flutter client using feature-first Clean Architecture, Riverpod for observed async state, Dio for networking, and GoRouter named routes.
 - `mcp_demo/`: Existing exploratory notebook; it is not part of the production application.
 
-Sprint 1 persists accepted generation jobs and runs a temporary background status lifecycle. The generation graph, media tooling, and local asset cache remain scheduled for later sprints.
+Sprint 1 persists accepted generation jobs and runs a background status lifecycle. Sprint 2 wires the Intake stage (MarkItDown) into a real LangGraph pipeline. Sprint 3 adds the Curriculum stage, the first LLM-backed node, calling a local Ollama server through the LLM Provider Layer. The remaining pipeline stages, media tooling, and local asset cache remain scheduled for later sprints.
 
 ## Run the backend
 
-Python 3.12 is required.
+Python 3.12 is required. The Curriculum stage calls a local [Ollama](https://ollama.com) server; install it and pull the configured model (`llama3.1` by default) before generating a video, or the pipeline will complete Intake and then fail explicitly at Curriculum:
+
+```bash
+ollama pull llama3.1
+```
 
 ```bash
 cd backend
@@ -50,7 +54,7 @@ docker compose up -d
 docker compose exec backend alembic upgrade head
 ```
 
-The backend is available at `http://localhost:8000`; its health endpoint is `http://localhost:8000/health`. Source changes under `backend/` reload automatically in the development container.
+The backend is available at `http://localhost:8000`; its health endpoint is `http://localhost:8000/health`. Source changes under `backend/` reload automatically in the development container. The container reaches Ollama on the host via `host.docker.internal`, which `docker-compose.yml` maps for you — run Ollama on the host machine, not inside the stack.
 
 View service logs or stop the stack:
 
@@ -87,8 +91,8 @@ For an Android emulator, replace `localhost` with the host alias appropriate to 
 
 ## API contract
 
-`POST /api/v1/videos/generate` accepts `class_level`, `subject`, and `chapter_title`; it returns `202 Accepted` and a UUID-backed queued task. Query `GET /api/v1/videos/{task_id}` for its current status. Sprint 1 advances the job through a mock `QUEUED → PROCESSING → COMPLETED` lifecycle; no video is generated yet.
+`POST /api/v1/videos/generate` accepts `class_level`, `subject`, `chapter_title`, and `file_storage_path`; it returns `202 Accepted` and a UUID-backed queued task. Query `GET /api/v1/videos/{task_id}` for its current status. The job moves through `QUEUED → PROCESSING → COMPLETED` (or `FAILED`, with `error_message` set) as it runs the Intake stage (MarkItDown parses the source file to Markdown) and the Curriculum stage (Ollama structures that Markdown into concept `sections`); no video is rendered yet.
 
 ## Environment
 
-Copy `.env.example` to `.env` and set the PostgreSQL credentials and `DATABASE_URL` for local execution. Docker Compose automatically provides the backend container with a database URL that targets the `postgres` service. Run `alembic upgrade head` before using database-backed endpoints. The Flutter API base URL is supplied through `--dart-define`, keeping environment-specific values out of source control.
+Copy `.env.example` to `.env` and set the PostgreSQL credentials, `DATABASE_URL`, and Ollama settings (`OLLAMA_BASE_URL`, `OLLAMA_MODEL`) for local execution. Docker Compose automatically provides the backend container with a database URL that targets the `postgres` service and an Ollama URL that targets the host machine. Run `alembic upgrade head` before using database-backed endpoints. The Flutter API base URL is supplied through `--dart-define`, keeping environment-specific values out of source control.

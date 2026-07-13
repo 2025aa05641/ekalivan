@@ -3,6 +3,7 @@
 from app.core.interfaces import IMcpTool
 from app.features.video_generator.graph import build_video_generation_graph
 from app.features.video_generator.models import VideoGenerationState
+from tests.conftest import FakeLlmProvider
 
 
 class _StubParserTool(IMcpTool):
@@ -12,11 +13,12 @@ class _StubParserTool(IMcpTool):
         return f"# Parsed: {kwargs['file_path']}"
 
 
-async def test_graph_invocation_populates_markdown_content() -> None:
-    """Invoking the compiled graph runs the Parser agent and returns Markdown content."""
-    graph = build_video_generation_graph(_StubParserTool())
+async def test_graph_invocation_runs_intake_then_curriculum() -> None:
+    """Invoking the compiled graph runs Parser then Curriculum in order."""
+    graph = build_video_generation_graph(_StubParserTool(), FakeLlmProvider())
 
     raw_result = await graph.ainvoke(VideoGenerationState(file_path="chapter.pdf"))
     result = VideoGenerationState.model_validate(raw_result)
 
     assert result.markdown_content == "# Parsed: chapter.pdf"
+    assert result.sections[0].title == "Mock Section"

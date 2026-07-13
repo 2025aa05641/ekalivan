@@ -34,20 +34,21 @@ class VideoGenerationResponse(BaseModel):
     status: VideoTaskStatus
 
 
+class ChapterSection(BaseModel):
+    """Structured chapter section produced by the curriculum stage."""
+
+    title: NonBlankString
+    content: NonBlankString
+
+
 class JobStatusResponse(BaseModel):
     """Current status response for a persisted video-generation job."""
 
     task_id: UUID
     status: VideoTaskStatus
     markdown_content: str | None = None
+    sections: list[ChapterSection] | None = None
     error_message: str | None = None
-
-
-class ChapterSection(BaseModel):
-    """Structured chapter section produced by the curriculum stage."""
-
-    title: NonBlankString
-    content: NonBlankString
 
 
 class ScriptBeat(BaseModel):
