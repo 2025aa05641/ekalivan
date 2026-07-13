@@ -1,4 +1,18 @@
-# AI-Powered Textbook-to-Video Learning Platform
+# Ekalivan
+
+## Democratizing Quality Education Through AI
+
+### கற்போம் • கேட்போம் • பார்ப்போம் • பழகுவோம்
+
+**Karpom • Ketpom • Parpom • Pazhaguvom**
+
+*Learn • Listen • Visualize • Practice*
+
+---
+
+An AI-powered personalized learning platform that empowers every learner through multilingual, curriculum-aligned learning experiences.
+
+Built with ❤️ by **Team 4NLPians** for the **Build in AI for India Hackathon**.
 
 This repository contains the Sprint 0 foundation for the platform defined in the Executive Architecture Design Document. The system keeps AI work on the content-creation path and serves rendered video assets without AI work at playback time.
 
