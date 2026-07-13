@@ -1,0 +1,35 @@
+/// Riverpod async state for requesting a video generation task.
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../core/network/api_client.dart';
+import '../../data/datasources/video_remote_data_source.dart';
+import '../../data/repositories/video_repository_impl.dart';
+import '../../domain/entities/video_job_entity.dart';
+import '../../domain/repositories/video_repository.dart';
+import '../../domain/value_objects/video_generation_request_params.dart';
+
+/// Provides the shared network client for data-layer dependencies.
+final Provider<ApiClient> apiClientProvider = Provider<ApiClient>((Ref ref) => ApiClient());
+
+/// Provides the repository contract to presentation code through dependency injection.
+final Provider<IVideoRepository> videoRepositoryProvider = Provider<IVideoRepository>(
+  (Ref ref) => VideoRepositoryImpl(VideoRemoteDataSource(ref.watch(apiClientProvider))),
+);
+
+/// Owns the async request lifecycle displayed by generation screens in later sprints.
+final AsyncNotifierProvider<VideoGenerationNotifier, VideoJobEntity?> videoGenerationProvider =
+    AsyncNotifierProvider<VideoGenerationNotifier, VideoJobEntity?>(VideoGenerationNotifier.new);
+
+/// Converts a user action into observed asynchronous generation state.
+class VideoGenerationNotifier extends AsyncNotifier<VideoJobEntity?> {
+  @override
+  VideoJobEntity? build() => null;
+
+  /// Starts an accepted-job request and exposes its result or failure as AsyncValue.
+  Future<void> request(VideoGenerationRequestParams params) async {
+    state = const AsyncLoading<VideoJobEntity?>();
+    state = await AsyncValue.guard(
+      () => ref.read(videoRepositoryProvider).requestVideoGeneration(params: params),
+    );
+  }
+}
