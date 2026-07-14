@@ -1,7 +1,8 @@
 """Agent node tests."""
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 from app.core.interfaces import IMcpTool
 from app.features.video_generator.agents import (
@@ -167,7 +168,7 @@ async def test_narration_agent_returns_narrated_beats(tmp_path: Path) -> None:
                         start_seconds=0.0,
                         end_seconds=0.5,
                     ),
-                ]
+                ],
             )
         ]
     }

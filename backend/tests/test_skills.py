@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from app.features.video_generator.models import ChapterSection, NarratedBeat, ScriptBeat,WordTimestamp
+from app.features.video_generator.models import ChapterSection, NarratedBeat, ScriptBeat, WordTimestamp
 from app.features.video_generator.skills.curriculum import CurriculumSkill
 from app.features.video_generator.skills.lesson_planning import LessonPlanningSkill
 from app.features.video_generator.skills.narration import NarrationSkill

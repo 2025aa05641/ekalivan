@@ -20,10 +20,8 @@ class Settings(BaseSettings):
     static_assets_path: str = "rendered"
     database_url: str = "postgresql+asyncpg://textbook_video:textbook_video@localhost:5432/textbook_video"
     ollama_base_url: str = "http://localhost:11434"
-    ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "gemma4:latest"
     ollama_fallback_model: str | None = None
-    ollama_timeout_seconds: float = Field(default=120.0, gt=0)
     ollama_timeout_seconds: float = Field(default=120.0, gt=0)
     max_concurrent_render_jobs: int = Field(default=2, ge=1)
 
