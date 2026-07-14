@@ -91,8 +91,16 @@ async def test_edge_tts_execute_requires_string_arguments() -> None:
 
 
 _TEST_BEATS = [
-    {"narration": "Plants make their own food.", "audio_path": SILENT_AUDIO_FIXTURE_PATH},
-    {"narration": "They use sunlight to do it.", "audio_path": SILENT_AUDIO_FIXTURE_PATH},
+    {
+        "narration": "Plants make their own food.",
+        "visual_prompt": "A plant in a pot under the sun.",
+        "audio_path": SILENT_AUDIO_FIXTURE_PATH,
+    },
+    {
+        "narration": "They use sunlight to do it.",
+        "visual_prompt": "An arrow connecting sunlight to a leaf.",
+        "audio_path": SILENT_AUDIO_FIXTURE_PATH,
+    },
 ]
 
 

@@ -9,11 +9,14 @@ import aiofiles
 import aiofiles.os
 import edge_tts
 import imageio_ffmpeg
+import numpy as np
 from markitdown import MarkItDown
-from moviepy import AudioFileClip, ColorClip, CompositeVideoClip, TextClip, concatenate_videoclips
+from moviepy import AudioFileClip, ColorClip, CompositeVideoClip, ImageClip, TextClip, concatenate_videoclips
+from moviepy.video.VideoClip import VideoClip
 
 from app.core.interfaces import IMcpTool
 from app.core.retry import retry_with_backoff
+from app.features.video_generator import icon_library
 from app.features.video_generator.models import WordTimestamp
 
 _TICKS_PER_SECOND = 10_000_000
@@ -152,13 +155,16 @@ class EdgeTtsTool(IMcpTool):
 
 
 class MoviePyTool(IMcpTool):
-    """Composites narrated beats into one silent-free video via MoviePy.
+    """Composites narrated beats into one animated, illustrated video via MoviePy.
 
-    Each beat becomes one scene: a solid-color background sized and timed to its
-    narration audio, with the narration text burned in as a lower-third caption.
-    No illustration is generated for the ``visual_prompt`` text — image generation
-    is explicitly out of MVP scope (``FutureImageGenerationTool`` in the
-    architecture document is a placeholder only).
+    Each beat becomes one scene: a solid-color background, a programmatically
+    drawn vector-style icon chosen from the beat's ``visual_prompt`` (see
+    ``icon_library``) with a Ken Burns zoom-and-pan over its duration, a soft
+    highlight glow behind the icon, an optional connecting-arrow overlay when
+    the prompt calls for one, and the narration text burned in as a
+    lower-third caption. No external image-generation API is used — every
+    illustration is drawn locally, keeping the pipeline offline and free of
+    per-frame generation cost or licensing concerns.
     """
 
     def __init__(self, video_size: tuple[int, int] = (1280, 720), fps: int = 24) -> None:
@@ -176,7 +182,8 @@ class MoviePyTool(IMcpTool):
 
         Args:
             kwargs: Must contain ``beats`` (``list`` of narrated-beat mappings with
-                ``narration`` and ``audio_path``) and ``output_path`` (``str``).
+                ``narration``, ``visual_prompt``, and ``audio_path``) and
+                ``output_path`` (``str``).
 
         Returns:
             ``output_path``, once the composed video has been written.
@@ -196,27 +203,15 @@ class MoviePyTool(IMcpTool):
         """Render the beat clips and write the concatenated video to disk.
 
         Args:
-            beats: Narrated-beat mappings with ``narration`` and ``audio_path`` keys.
+            beats: Narrated-beat mappings with ``narration``, ``visual_prompt``,
+                and ``audio_path`` keys.
             output_path: Destination path for the composed (not yet fast-start) video.
         """
         scenes = []
         try:
             for beat in beats:
                 assert isinstance(beat, Mapping)
-                audio = AudioFileClip(str(beat["audio_path"]))
-                background = ColorClip(size=self._video_size, color=(30, 60, 114), duration=audio.duration)
-                caption = (
-                    TextClip(
-                        text=str(beat["narration"]),
-                        font_size=40,
-                        color="white",
-                        size=(self._video_size[0] - 120, None),
-                        method="caption",
-                    )
-                    .with_duration(audio.duration)
-                    .with_position(("center", "bottom"))
-                )
-                scenes.append(CompositeVideoClip([background, caption]).with_audio(audio))
+                scenes.append(self._compose_scene(beat))
             final = concatenate_videoclips(scenes)
             try:
                 final.write_videofile(output_path, fps=self._fps, codec="libx264", audio_codec="aac", logger=None)
@@ -225,6 +220,61 @@ class MoviePyTool(IMcpTool):
         finally:
             for scene in scenes:
                 scene.close()
+
+    def _compose_scene(self, beat: Mapping[str, object]) -> CompositeVideoClip:
+        """Composite one narrated beat into an illustrated, animated scene clip.
+
+        Args:
+            beat: Narrated-beat mapping with ``narration``, ``visual_prompt``,
+                and ``audio_path`` keys.
+
+        Returns:
+            One scene clip, its duration and audio track matching the beat's narration.
+        """
+        audio = AudioFileClip(str(beat["audio_path"]))
+        duration = audio.duration
+        visual_prompt = str(beat["visual_prompt"])
+        width, height = self._video_size
+
+        layers: list[VideoClip] = [ColorClip(size=self._video_size, color=(30, 60, 114), duration=duration)]
+
+        icon_size = min(width, height) // 2
+        icon_top_left = ((width - icon_size) // 2, height // 6)
+        highlight = (
+            ImageClip(np.array(icon_library.render_highlight(int(icon_size * 1.6))))
+            .with_duration(duration)
+            .with_position((icon_top_left[0] - int(icon_size * 0.3), icon_top_left[1] - int(icon_size * 0.3)))
+        )
+        layers.append(highlight)
+
+        if icon_library.should_show_arrow_overlay(visual_prompt):
+            layers.append(ImageClip(np.array(icon_library.render_arrow_overlay(width, height))).with_duration(duration))
+
+        icon_key = icon_library.select_icon_key(visual_prompt)
+        icon = (
+            ImageClip(np.array(icon_library.render_icon(icon_key, icon_size)))
+            .with_duration(duration)
+            .resized(lambda t, d=duration: 1 + 0.12 * (t / d))
+            .with_position(
+                lambda t, x=icon_top_left[0], y=icon_top_left[1], d=duration: (x - 12 * (t / d), y - 8 * (t / d))
+            )
+        )
+        layers.append(icon)
+
+        caption = (
+            TextClip(
+                text=str(beat["narration"]),
+                font_size=40,
+                color="white",
+                size=(width - 120, None),
+                method="caption",
+            )
+            .with_duration(duration)
+            .with_position(("center", "bottom"))
+        )
+        layers.append(caption)
+
+        return CompositeVideoClip(layers).with_audio(audio)
 
 
 class FFmpegTool(IMcpTool):
