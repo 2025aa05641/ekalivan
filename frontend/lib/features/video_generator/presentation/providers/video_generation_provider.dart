@@ -42,3 +42,13 @@ final StreamProviderFamily<VideoStatusUpdateEntity, String> videoProgressProvide
     StreamProvider.family<VideoStatusUpdateEntity, String>(
   (Ref ref, String taskId) => ref.watch(videoRepositoryProvider).watchGenerationProgress(taskId: taskId),
 );
+
+/// Loads previously completed videos cached for offline playback.
+///
+/// `autoDispose` so the list is re-read from the cache every time the My
+/// Videos screen is (re)entered, rather than reusing a stale result from
+/// before the most recently completed job was cached.
+final AutoDisposeFutureProvider<List<VideoJobEntity>> myVideosProvider =
+    FutureProvider.autoDispose<List<VideoJobEntity>>(
+  (Ref ref) => ref.watch(videoRepositoryProvider).getOfflineCachedVideos(),
+);

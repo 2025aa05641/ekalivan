@@ -5,8 +5,11 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../domain/entities/video_job_entity.dart';
+import '../screens/cached_video_screen.dart';
 import '../screens/generation_screen.dart';
 import '../screens/home_screen.dart';
+import '../screens/my_videos_screen.dart';
 
 /// Application routes. Named routes avoid raw route strings in feature widgets.
 enum AppRoute {
@@ -14,7 +17,13 @@ enum AppRoute {
   home('/', 'home'),
 
   /// Generation progress and playback route for one accepted job.
-  generation('/videos/:taskId', 'generation');
+  generation('/videos/:taskId', 'generation'),
+
+  /// List of previously generated videos cached for offline playback.
+  myVideos('/my-videos', 'myVideos'),
+
+  /// Playback route for one cached video, given via `extra`.
+  cachedVideo('/my-videos/player', 'cachedVideo');
 
   /// Creates a named application route.
   const AppRoute(this.path, this.routeName);
@@ -41,6 +50,17 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>(
         name: AppRoute.generation.routeName,
         builder: (BuildContext context, GoRouterState state) =>
             GenerationScreen(taskId: state.pathParameters['taskId']!),
+      ),
+      GoRoute(
+        path: AppRoute.myVideos.path,
+        name: AppRoute.myVideos.routeName,
+        builder: (BuildContext context, GoRouterState state) => const MyVideosScreen(),
+      ),
+      GoRoute(
+        path: AppRoute.cachedVideo.path,
+        name: AppRoute.cachedVideo.routeName,
+        builder: (BuildContext context, GoRouterState state) =>
+            CachedVideoScreen(job: state.extra! as VideoJobEntity),
       ),
     ],
   ),

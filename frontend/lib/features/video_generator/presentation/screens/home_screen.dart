@@ -33,7 +33,16 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Learn with Videos')),
+      appBar: AppBar(
+        title: const Text('Learn with Videos'),
+        actions: <Widget>[
+          IconButton(
+            icon: const Icon(Icons.video_library),
+            tooltip: 'My Videos',
+            onPressed: () => context.pushNamed(AppRoute.myVideos.routeName),
+          ),
+        ],
+      ),
       body: const SafeArea(
         child: ResponsiveLayoutGate(
           phone: _SubjectBody(crossAxisCount: 1),
