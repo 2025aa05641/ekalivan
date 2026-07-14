@@ -179,8 +179,12 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>(
       GoRoute(
         path: AppRoute.studentChapterDetail.path,
         name: AppRoute.studentChapterDetail.routeName,
-        builder: (BuildContext context, GoRouterState state) =>
-            ChapterDetailScreen(chapterId: state.pathParameters['chapterId']!),
+        builder: (BuildContext context, GoRouterState state) => ChapterDetailScreen(
+          medium: state.pathParameters['medium']!,
+          grade: state.pathParameters['grade']!,
+          subject: state.pathParameters['subject']!,
+          chapterId: state.pathParameters['chapterId']!,
+        ),
       ),
     ],
   ),

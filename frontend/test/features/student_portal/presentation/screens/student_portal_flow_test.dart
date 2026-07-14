@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:textbook_video_learning/app.dart';
+import 'package:textbook_video_learning/core/widgets/video_card.dart';
 import 'package:textbook_video_learning/features/student_portal/presentation/screens/chapter_detail_screen.dart';
 import 'package:textbook_video_learning/features/student_portal/presentation/screens/chapter_list_screen.dart';
 import 'package:textbook_video_learning/features/student_portal/presentation/screens/class_selection_screen.dart';
@@ -34,11 +35,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(ChapterListScreen), findsOneWidget);
 
-    await tester.tap(find.text('Watch Lesson').first);
+    // Chapter 2 (unlike Chapter 1) is still a placeholder, so tapping it
+    // here doesn't require faking a video-generation backend.
+    await tester.tap(find.text('Watch Lesson').at(1));
     await tester.pumpAndSettle();
     expect(find.byType(ChapterDetailScreen), findsOneWidget);
-    expect(find.text('Chapter 1'), findsOneWidget);
-    expect(find.text('The World of Plants'), findsWidgets);
+    expect(find.text('Chapter 2'), findsOneWidget);
+    expect(find.text('Food and Nutrition'), findsWidgets);
+
+    await tester.tap(find.byType(VideoCard));
+    await tester.pump();
+    expect(find.text('This lesson is being prepared.'), findsOneWidget);
 
     await tester.scrollUntilVisible(find.text('Photosynthesis'), 200);
     expect(find.text('Photosynthesis'), findsOneWidget);
