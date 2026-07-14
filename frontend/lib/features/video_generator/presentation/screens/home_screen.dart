@@ -31,6 +31,11 @@ class HomeScreen extends StatelessWidget {
             onPressed: () => context.pushNamed(AppRoute.myVideos.routeName),
           ),
           IconButton(
+            icon: const Icon(Icons.school_outlined),
+            tooltip: 'Student Portal',
+            onPressed: () => context.pushNamed(AppRoute.studentSplash.routeName),
+          ),
+          IconButton(
             icon: const Icon(Icons.admin_panel_settings_outlined),
             tooltip: 'Creator Portal',
             onPressed: () => context.pushNamed(AppRoute.adminLogin.routeName),

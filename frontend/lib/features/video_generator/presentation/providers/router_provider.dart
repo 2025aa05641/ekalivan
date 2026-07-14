@@ -11,6 +11,12 @@ import '../../../creator_portal/presentation/screens/pipeline_complete_screen.da
 import '../../../creator_portal/presentation/screens/pipeline_progress_screen.dart';
 import '../../../creator_portal/presentation/screens/rendering_progress_screen.dart';
 import '../../../creator_portal/presentation/screens/upload_book_screen.dart';
+import '../../../student_portal/presentation/screens/chapter_detail_screen.dart';
+import '../../../student_portal/presentation/screens/chapter_list_screen.dart';
+import '../../../student_portal/presentation/screens/class_selection_screen.dart';
+import '../../../student_portal/presentation/screens/medium_selection_screen.dart';
+import '../../../student_portal/presentation/screens/student_splash_screen.dart';
+import '../../../student_portal/presentation/screens/subject_selection_screen.dart';
 import '../../domain/entities/video_job_entity.dart';
 import '../screens/cached_video_screen.dart';
 import '../screens/generation_screen.dart';
@@ -47,7 +53,25 @@ enum AppRoute {
   adminRendering('/admin/pipeline/:taskId/rendering', 'adminRendering'),
 
   /// Creator portal pipeline-completed screen for one accepted job.
-  adminComplete('/admin/pipeline/:taskId/complete', 'adminComplete');
+  adminComplete('/admin/pipeline/:taskId/complete', 'adminComplete'),
+
+  /// Student portal entry screen: branding and "Get Started".
+  studentSplash('/student', 'studentSplash'),
+
+  /// Student portal medium selection (English/Tamil).
+  studentMedium('/student/medium', 'studentMedium'),
+
+  /// Student portal class (grade) selection for a chosen medium.
+  studentClass('/student/:medium/class', 'studentClass'),
+
+  /// Student portal subject selection for a chosen medium and grade.
+  studentSubject('/student/:medium/:grade/subject', 'studentSubject'),
+
+  /// Student portal chapter list for a chosen medium, grade, and subject.
+  studentChapters('/student/:medium/:grade/:subject/chapters', 'studentChapters'),
+
+  /// Student portal chapter detail: lesson video and topics.
+  studentChapterDetail('/student/:medium/:grade/:subject/:chapterId', 'studentChapterDetail');
 
   /// Creates a named application route.
   const AppRoute(this.path, this.routeName);
@@ -118,6 +142,45 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>(
         name: AppRoute.adminComplete.routeName,
         builder: (BuildContext context, GoRouterState state) =>
             PipelineCompleteScreen(taskId: state.pathParameters['taskId']!),
+      ),
+      GoRoute(
+        path: AppRoute.studentSplash.path,
+        name: AppRoute.studentSplash.routeName,
+        builder: (BuildContext context, GoRouterState state) => const StudentSplashScreen(),
+      ),
+      GoRoute(
+        path: AppRoute.studentMedium.path,
+        name: AppRoute.studentMedium.routeName,
+        builder: (BuildContext context, GoRouterState state) => const MediumSelectionScreen(),
+      ),
+      GoRoute(
+        path: AppRoute.studentClass.path,
+        name: AppRoute.studentClass.routeName,
+        builder: (BuildContext context, GoRouterState state) =>
+            ClassSelectionScreen(medium: state.pathParameters['medium']!),
+      ),
+      GoRoute(
+        path: AppRoute.studentSubject.path,
+        name: AppRoute.studentSubject.routeName,
+        builder: (BuildContext context, GoRouterState state) => SubjectSelectionScreen(
+          medium: state.pathParameters['medium']!,
+          grade: state.pathParameters['grade']!,
+        ),
+      ),
+      GoRoute(
+        path: AppRoute.studentChapters.path,
+        name: AppRoute.studentChapters.routeName,
+        builder: (BuildContext context, GoRouterState state) => ChapterListScreen(
+          medium: state.pathParameters['medium']!,
+          grade: state.pathParameters['grade']!,
+          subject: state.pathParameters['subject']!,
+        ),
+      ),
+      GoRoute(
+        path: AppRoute.studentChapterDetail.path,
+        name: AppRoute.studentChapterDetail.routeName,
+        builder: (BuildContext context, GoRouterState state) =>
+            ChapterDetailScreen(chapterId: state.pathParameters['chapterId']!),
       ),
     ],
   ),
