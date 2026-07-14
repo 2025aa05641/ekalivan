@@ -1,6 +1,7 @@
 """Agent node tests."""
 
 import pytest
+from pathlib import Path
 
 from app.core.interfaces import IMcpTool
 from app.features.video_generator.agents import (
@@ -13,7 +14,13 @@ from app.features.video_generator.agents import (
     TeacherAgent,
     VideoRenderingAgent,
 )
-from app.features.video_generator.models import ChapterSection, NarratedBeat, ScriptBeat, VideoGenerationState
+from app.features.video_generator.models import (
+    ChapterSection,
+    NarratedBeat,
+    ScriptBeat,
+    VideoGenerationState,
+    WordTimestamp,
+)
 from app.features.video_generator.skills.curriculum import CurriculumSkill
 from app.features.video_generator.skills.lesson_planning import LessonPlanningSkill
 from app.features.video_generator.skills.narration import NarrationSkill
@@ -139,7 +146,7 @@ async def test_storyboard_agent_requires_sections() -> None:
         await agent(state)
 
 
-async def test_narration_agent_returns_narrated_beats(tmp_path) -> None:
+async def test_narration_agent_returns_narrated_beats(tmp_path: Path) -> None:
     """The agent maps the Narration skill's result onto the narrated_beats state field."""
     agent = NarrationAgent(NarrationSkill(FakeTtsTool(), tmp_path))
     beat = ScriptBeat(narration="Plants make food.", visual_prompt="A sunlit leaf.", duration_seconds=4.0)
@@ -154,13 +161,19 @@ async def test_narration_agent_returns_narrated_beats(tmp_path) -> None:
                 visual_prompt="A sunlit leaf.",
                 duration_seconds=4.0,
                 audio_path=str(tmp_path / "job-1" / "beat_000.mp3"),
-                word_timestamps=[{"word": "Mock", "start_seconds": 0.0, "end_seconds": 0.5}],
+                word_timestamps=[
+                    WordTimestamp(
+                        word="Mock",
+                        start_seconds=0.0,
+                        end_seconds=0.5,
+                    ),
+                ]
             )
         ]
     }
 
 
-async def test_narration_agent_requires_storyboard_beats(tmp_path) -> None:
+async def test_narration_agent_requires_storyboard_beats(tmp_path: Path) -> None:
     """The agent fails explicitly when the Storyboard stage has not run yet."""
     agent = NarrationAgent(NarrationSkill(FakeTtsTool(), tmp_path))
     state = VideoGenerationState(file_path="x.pdf", task_id="job-1")
@@ -169,7 +182,7 @@ async def test_narration_agent_requires_storyboard_beats(tmp_path) -> None:
         await agent(state)
 
 
-async def test_video_rendering_agent_returns_output_video_path(tmp_path) -> None:
+async def test_video_rendering_agent_returns_output_video_path(tmp_path: Path) -> None:
     """The agent maps the Rendering skill's result onto the output_video_path state field."""
     agent = VideoRenderingAgent(RenderingSkill(FakeCompositionTool(), FakeEncodeTool(), tmp_path))
     narrated_beat = NarratedBeat(
@@ -182,7 +195,7 @@ async def test_video_rendering_agent_returns_output_video_path(tmp_path) -> None
     assert update == {"output_video_path": str(tmp_path / "job-1" / "final.mp4")}
 
 
-async def test_video_rendering_agent_requires_narrated_beats(tmp_path) -> None:
+async def test_video_rendering_agent_requires_narrated_beats(tmp_path: Path) -> None:
     """The agent fails explicitly when the Narration stage has not run yet."""
     agent = VideoRenderingAgent(RenderingSkill(FakeCompositionTool(), FakeEncodeTool(), tmp_path))
     state = VideoGenerationState(file_path="x.pdf", task_id="job-1")
@@ -191,7 +204,7 @@ async def test_video_rendering_agent_requires_narrated_beats(tmp_path) -> None:
         await agent(state)
 
 
-async def test_publishing_agent_returns_video_url(tmp_path) -> None:
+async def test_publishing_agent_returns_video_url(tmp_path: Path) -> None:
     """The agent maps the Publishing skill's result onto the video_url state field."""
     agent = PublishingAgent(PublishingSkill(FakeStorageTool(), tmp_path))
     state = VideoGenerationState(
@@ -203,7 +216,7 @@ async def test_publishing_agent_returns_video_url(tmp_path) -> None:
     assert update == {"video_url": "/static/video/job-1/final.mp4"}
 
 
-async def test_publishing_agent_requires_output_video_path(tmp_path) -> None:
+async def test_publishing_agent_requires_output_video_path(tmp_path: Path) -> None:
     """The agent fails explicitly when the Video Rendering stage has not run yet."""
     agent = PublishingAgent(PublishingSkill(FakeStorageTool(), tmp_path))
     state = VideoGenerationState(file_path="x.pdf", task_id="job-1")

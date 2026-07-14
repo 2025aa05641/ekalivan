@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from app.features.video_generator.models import ChapterSection, NarratedBeat, ScriptBeat
+from app.features.video_generator.models import ChapterSection, NarratedBeat, ScriptBeat,WordTimestamp
 from app.features.video_generator.skills.curriculum import CurriculumSkill
 from app.features.video_generator.skills.lesson_planning import LessonPlanningSkill
 from app.features.video_generator.skills.narration import NarrationSkill
@@ -76,7 +76,13 @@ async def test_narrate_beat_returns_narrated_beat_from_tool(tmp_path: Path) -> N
         visual_prompt="A sunlit leaf.",
         duration_seconds=4.0,
         audio_path=str(tmp_path / "job-42" / "beat_002.mp3"),
-        word_timestamps=[{"word": "Mock", "start_seconds": 0.0, "end_seconds": 0.5}],
+        word_timestamps=[
+            WordTimestamp(
+                word="Mock",
+                start_seconds=0.0,
+                end_seconds=0.5,
+            ),
+        ],
     )
 
 
