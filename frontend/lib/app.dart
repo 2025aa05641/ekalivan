@@ -13,7 +13,7 @@ class TextbookVideoApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
-      title: 'Learn with Videos',
+      title: 'Ekalivan',
       theme: AppTheme.lightTheme,
       routerConfig: ref.watch(routerProvider),
       debugShowCheckedModeBanner: false,
