@@ -2,32 +2,57 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/constants/demo_chapter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/app_scaffold.dart';
 import '../../../../core/widgets/dashboard_card.dart';
 import '../../../../core/widgets/primary_button.dart';
+import '../../../video_generator/domain/entities/video_job_entity.dart';
 import '../../../video_generator/presentation/providers/router_provider.dart';
+import '../../../video_generator/presentation/providers/video_generation_provider.dart';
 
 /// Upload-a-book screen: choose a PDF, then its medium and class.
 ///
-/// UI only (Phase 3): selecting a file only sets local widget state; the
-/// actual upload happens in Phase 4.
-class UploadBookScreen extends StatefulWidget {
+/// The file picker, medium, and class are still mocked — there is no real
+/// upload or chapter-catalog endpoint (see [demoChapter]) — but
+/// "Upload & Process" now starts a real backend generation job and carries
+/// its task ID through the rest of the pipeline screens.
+class UploadBookScreen extends ConsumerStatefulWidget {
   /// Creates the upload book screen.
   const UploadBookScreen({super.key});
 
   @override
-  State<UploadBookScreen> createState() => _UploadBookScreenState();
+  ConsumerState<UploadBookScreen> createState() => _UploadBookScreenState();
 }
 
-class _UploadBookScreenState extends State<UploadBookScreen> {
+class _UploadBookScreenState extends ConsumerState<UploadBookScreen> {
   String? _selectedFileName = 'Science_6th_Standard.pdf';
   String _medium = 'English';
   String _grade = 'Grade 6';
+  bool _isSubmitting = false;
+
+  Future<void> _uploadAndProcess() async {
+    setState(() => _isSubmitting = true);
+    await ref.read(videoGenerationProvider.notifier).request(demoChapter);
+    if (!mounted) {
+      return;
+    }
+    setState(() => _isSubmitting = false);
+    final AsyncValue<VideoJobEntity?> state = ref.read(videoGenerationProvider);
+    final VideoJobEntity? job = state.valueOrNull;
+    if (job != null) {
+      context.goNamed(AppRoute.adminPipeline.routeName, pathParameters: <String, String>{'taskId': job.taskId});
+      return;
+    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(state.error?.toString() ?? 'Unable to start generation.')));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +107,8 @@ class _UploadBookScreenState extends State<UploadBookScreen> {
           const SizedBox(height: AppSpacing.lg),
           PrimaryButton(
             label: 'Upload & Process',
-            onPressed: _selectedFileName == null ? null : () => context.goNamed(AppRoute.adminPipeline.routeName),
+            loading: _isSubmitting,
+            onPressed: _selectedFileName == null || _isSubmitting ? null : _uploadAndProcess,
           ),
         ],
       ),

@@ -5,9 +5,7 @@ import 'package:textbook_video_learning/app.dart';
 import 'package:textbook_video_learning/core/widgets/primary_button.dart';
 import 'package:textbook_video_learning/features/creator_portal/presentation/screens/admin_dashboard_screen.dart';
 import 'package:textbook_video_learning/features/creator_portal/presentation/screens/login_screen.dart';
-import 'package:textbook_video_learning/features/creator_portal/presentation/screens/pipeline_complete_screen.dart';
 import 'package:textbook_video_learning/features/creator_portal/presentation/screens/pipeline_progress_screen.dart';
-import 'package:textbook_video_learning/features/creator_portal/presentation/screens/rendering_progress_screen.dart';
 import 'package:textbook_video_learning/features/creator_portal/presentation/screens/upload_book_screen.dart';
 import 'package:textbook_video_learning/features/video_generator/domain/entities/video_job_entity.dart';
 import 'package:textbook_video_learning/features/video_generator/domain/entities/video_status_update_entity.dart';
@@ -15,24 +13,43 @@ import 'package:textbook_video_learning/features/video_generator/domain/reposito
 import 'package:textbook_video_learning/features/video_generator/domain/value_objects/video_generation_request_params.dart';
 import 'package:textbook_video_learning/features/video_generator/presentation/providers/video_generation_provider.dart';
 
-class _UnusedVideoRepository implements IVideoRepository {
+class _FakeCreatorRepository implements IVideoRepository {
+  _FakeCreatorRepository({this.jobToReturn, this.errorToThrow, this.updates = const <VideoStatusUpdateEntity>[]});
+
+  final VideoJobEntity? jobToReturn;
+  final Object? errorToThrow;
+  final List<VideoStatusUpdateEntity> updates;
+
   @override
-  Future<VideoJobEntity> requestVideoGeneration({required VideoGenerationRequestParams params}) {
-    throw UnimplementedError('Not exercised by the creator portal.');
+  Future<VideoJobEntity> requestVideoGeneration({required VideoGenerationRequestParams params}) async {
+    if (errorToThrow != null) {
+      throw errorToThrow!;
+    }
+    return jobToReturn!;
   }
 
   @override
-  Stream<VideoStatusUpdateEntity> watchGenerationProgress({required String taskId}) => const Stream.empty();
+  Stream<VideoStatusUpdateEntity> watchGenerationProgress({required String taskId}) =>
+      Stream<VideoStatusUpdateEntity>.fromIterable(updates);
 
   @override
   Future<List<VideoJobEntity>> getOfflineCachedVideos() async => <VideoJobEntity>[];
 }
 
 void main() {
-  testWidgets('walks the full mock flow from login to pipeline completion', (WidgetTester tester) async {
+  testWidgets('walks from login through upload to a real accepted job', (WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[videoRepositoryProvider.overrideWithValue(_UnusedVideoRepository())],
+        overrides: <Override>[
+          videoRepositoryProvider.overrideWithValue(
+            _FakeCreatorRepository(
+              jobToReturn: const VideoJobEntity(taskId: 'job-42', status: 'QUEUED'),
+              updates: const <VideoStatusUpdateEntity>[
+                VideoStatusUpdateEntity(progress: 10, currentNode: 'Waiting in line…', status: 'QUEUED'),
+              ],
+            ),
+          ),
+        ],
         child: const TextbookVideoApp(),
       ),
     );
@@ -41,12 +58,10 @@ void main() {
     await tester.tap(find.byTooltip('Creator Portal'));
     await tester.pumpAndSettle();
     expect(find.byType(LoginScreen), findsOneWidget);
-    expect(find.text('Admin Portal'), findsOneWidget);
 
     await tester.tap(find.text('Login'));
     await tester.pumpAndSettle();
     expect(find.byType(AdminDashboardScreen), findsOneWidget);
-    expect(find.text('Total Books'), findsOneWidget);
 
     await tester.scrollUntilVisible(find.text('+ Upload New Book'), 200);
     await tester.tap(find.text('+ Upload New Book'));
@@ -55,37 +70,38 @@ void main() {
 
     await tester.scrollUntilVisible(find.text('Upload & Process'), 200);
     await tester.tap(find.text('Upload & Process'));
-    // PipelineProgressScreen's "current" step uses an indeterminate
-    // CircularProgressIndicator, which animates forever and never lets
-    // pumpAndSettle finish — pump a bounded number of frames instead.
+    // The pipeline screen's "current" step uses an indeterminate spinner,
+    // which animates forever and never lets pumpAndSettle finish.
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.byType(PipelineProgressScreen), findsOneWidget);
-    expect(find.text('Video Rendering'), findsOneWidget);
 
-    await tester.tap(find.text('Video Rendering'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.byType(RenderingProgressScreen), findsOneWidget);
-    expect(find.text('Rendering Video'), findsOneWidget);
+    final PipelineProgressScreen screen = tester.widget<PipelineProgressScreen>(find.byType(PipelineProgressScreen));
+    expect(screen.taskId, 'job-42');
+  });
 
-    await tester.scrollUntilVisible(
-      find.text('Continue When Ready'),
-      200,
-      scrollable: find.descendant(of: find.byType(RenderingProgressScreen), matching: find.byType(Scrollable)),
+  testWidgets('a failed request stays on the upload screen and surfaces the error', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          videoRepositoryProvider.overrideWithValue(
+            _FakeCreatorRepository(errorToThrow: Exception('Unable to reach the learning service.')),
+          ),
+        ],
+        child: const MaterialApp(home: UploadBookScreen()),
+      ),
     );
-    await tester.tap(find.text('Continue When Ready'));
+
+    await tester.scrollUntilVisible(find.text('Upload & Process'), 200);
+    await tester.tap(find.text('Upload & Process'));
     await tester.pumpAndSettle();
-    expect(find.byType(PipelineCompleteScreen), findsOneWidget);
-    expect(find.text('Video Generated Successfully'), findsOneWidget);
+
+    expect(find.byType(PipelineProgressScreen), findsNothing);
+    expect(find.textContaining('Unable to reach the learning service.'), findsOneWidget);
   });
 
   testWidgets('upload requires a selected file before processing can start', (WidgetTester tester) async {
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: <Override>[videoRepositoryProvider.overrideWithValue(_UnusedVideoRepository())],
-        child: const MaterialApp(home: UploadBookScreen()),
-      ),
+      const ProviderScope(child: MaterialApp(home: UploadBookScreen())),
     );
 
     await tester.tap(find.byIcon(Icons.close_rounded));

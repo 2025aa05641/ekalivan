@@ -40,14 +40,14 @@ enum AppRoute {
   /// Creator portal book upload.
   adminUpload('/admin/upload', 'adminUpload'),
 
-  /// Creator portal 8-step AI pipeline overview.
-  adminPipeline('/admin/pipeline', 'adminPipeline'),
+  /// Creator portal 8-step AI pipeline overview for one accepted job.
+  adminPipeline('/admin/pipeline/:taskId', 'adminPipeline'),
 
-  /// Creator portal Video Rendering step detail.
-  adminRendering('/admin/pipeline/rendering', 'adminRendering'),
+  /// Creator portal Video Rendering step detail for one accepted job.
+  adminRendering('/admin/pipeline/:taskId/rendering', 'adminRendering'),
 
-  /// Creator portal pipeline-completed screen.
-  adminComplete('/admin/pipeline/complete', 'adminComplete');
+  /// Creator portal pipeline-completed screen for one accepted job.
+  adminComplete('/admin/pipeline/:taskId/complete', 'adminComplete');
 
   /// Creates a named application route.
   const AppRoute(this.path, this.routeName);
@@ -104,17 +104,20 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>(
       GoRoute(
         path: AppRoute.adminPipeline.path,
         name: AppRoute.adminPipeline.routeName,
-        builder: (BuildContext context, GoRouterState state) => const PipelineProgressScreen(),
+        builder: (BuildContext context, GoRouterState state) =>
+            PipelineProgressScreen(taskId: state.pathParameters['taskId']!),
       ),
       GoRoute(
         path: AppRoute.adminRendering.path,
         name: AppRoute.adminRendering.routeName,
-        builder: (BuildContext context, GoRouterState state) => const RenderingProgressScreen(),
+        builder: (BuildContext context, GoRouterState state) =>
+            RenderingProgressScreen(taskId: state.pathParameters['taskId']!),
       ),
       GoRoute(
         path: AppRoute.adminComplete.path,
         name: AppRoute.adminComplete.routeName,
-        builder: (BuildContext context, GoRouterState state) => const PipelineCompleteScreen(),
+        builder: (BuildContext context, GoRouterState state) =>
+            PipelineCompleteScreen(taskId: state.pathParameters['taskId']!),
       ),
     ],
   ),

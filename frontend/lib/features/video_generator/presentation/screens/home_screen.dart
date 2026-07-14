@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/constants/demo_chapter.dart';
 import '../../../../core/widgets/accessible_text.dart';
 import '../../domain/entities/video_job_entity.dart';
 import '../../domain/value_objects/video_generation_request_params.dart';
@@ -12,18 +13,6 @@ import '../providers/router_provider.dart';
 import '../providers/video_generation_provider.dart';
 import '../widgets/adaptive_subject_card.dart';
 import '../widgets/responsive_layout_gate.dart';
-
-/// Stand-in for a chapter catalog, which does not exist yet: the backend has
-/// no endpoint to list available chapters, only to generate from a known
-/// file path. This is the one chapter file present in every checkout
-/// (it backs the backend's own test suite), used here until a real
-/// chapter-selection flow exists.
-const VideoGenerationRequestParams _scienceDemoChapter = VideoGenerationRequestParams(
-  classLevel: '6',
-  subject: 'Science',
-  chapterTitle: 'The World of Plants',
-  fileStoragePath: 'tests/fixtures/sample_chapter.txt',
-);
 
 /// Provides the first, intentionally shallow navigation level.
 class HomeScreen extends StatelessWidget {
@@ -104,7 +93,7 @@ class _SubjectBody extends ConsumerWidget {
                 AdaptiveSubjectCard(
                   title: 'Science',
                   color: const Color(0xFFBAE6FD),
-                  onTap: () => _generateAndNavigate(context, ref, _scienceDemoChapter),
+                  onTap: () => _generateAndNavigate(context, ref, demoChapter),
                 ),
                 AdaptiveSubjectCard(
                   title: 'Mathematics',
