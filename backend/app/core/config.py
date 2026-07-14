@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.1"
     ollama_timeout_seconds: float = Field(default=120.0, gt=0)
+    max_concurrent_render_jobs: int = Field(default=2, ge=1)
 
     @property
     def cors_origins(self) -> list[str]:

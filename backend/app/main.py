@@ -58,6 +58,7 @@ def create_app(
     composition_tool: IMcpTool | None = None,
     encode_tool: IMcpTool | None = None,
     storage_tool: IMcpTool | None = None,
+    max_concurrent_render_jobs: int | None = None,
 ) -> FastAPI:
     """Build the configured API application for production or test use.
 
@@ -70,6 +71,7 @@ def create_app(
         composition_tool: Assembly-stage composition MCP tool to use in place of ``MoviePyTool``.
         encode_tool: Assembly-stage encode MCP tool to use in place of ``FFmpegTool``.
         storage_tool: Publishing-stage MCP tool to use in place of ``StorageTool``.
+        max_concurrent_render_jobs: Render-slot cap to use in place of ``settings.max_concurrent_render_jobs``.
 
     Returns:
         Fully configured FastAPI application.
@@ -98,6 +100,7 @@ def create_app(
         storage_tool or StorageTool(),
         static_assets_dir,
     )
+    app.state.render_semaphore = asyncio.Semaphore(max_concurrent_render_jobs or settings.max_concurrent_render_jobs)
     app.state.background_tasks = set()
     app.add_middleware(
         CORSMiddleware,

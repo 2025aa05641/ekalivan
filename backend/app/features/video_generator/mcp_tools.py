@@ -13,6 +13,7 @@ from markitdown import MarkItDown
 from moviepy import AudioFileClip, ColorClip, CompositeVideoClip, TextClip, concatenate_videoclips
 
 from app.core.interfaces import IMcpTool
+from app.core.retry import retry_with_backoff
 from app.features.video_generator.models import WordTimestamp
 
 _TICKS_PER_SECOND = 10_000_000
@@ -81,17 +82,30 @@ def _default_communicate_factory(text: str, voice: str) -> _CommunicateProtocol:
 class EdgeTtsTool(IMcpTool):
     """Synthesizes narration audio and captures word-level timestamps via Edge TTS."""
 
-    def __init__(self, communicate_factory: CommunicateFactory | None = None) -> None:
+    def __init__(
+        self,
+        communicate_factory: CommunicateFactory | None = None,
+        *,
+        max_attempts: int = 3,
+        initial_retry_delay_seconds: float = 1.0,
+    ) -> None:
         """Create the tool with an injectable Edge TTS communicate-session factory.
 
         Args:
             communicate_factory: Builds the streaming session for a given text/voice.
                 Defaults to a real ``edge_tts.Communicate`` session.
+            max_attempts: Total synthesis attempts before a transient failure propagates.
+            initial_retry_delay_seconds: Delay before the first retry.
         """
         self._communicate_factory = communicate_factory or _default_communicate_factory
+        self._max_attempts = max_attempts
+        self._initial_retry_delay_seconds = initial_retry_delay_seconds
 
     async def execute(self, **kwargs: object) -> object:
         """Synthesize ``text`` to ``output_path`` and return its word timestamps.
+
+        Retries the synthesis with exponential backoff on transient failures
+        (network drops, empty responses from the Edge TTS service).
 
         Args:
             kwargs: Must contain ``text``, ``voice``, and ``output_path`` (all ``str``).
@@ -101,7 +115,6 @@ class EdgeTtsTool(IMcpTool):
 
         Raises:
             TypeError: If a required argument is missing or not a string.
-            ValueError: If synthesis produced no word timestamps.
         """
         text = kwargs.get("text")
         voice = kwargs.get("voice")
@@ -110,24 +123,32 @@ class EdgeTtsTool(IMcpTool):
             raise TypeError("EdgeTtsTool requires string 'text', 'voice', and 'output_path' arguments.")
 
         await aiofiles.os.makedirs(str(Path(output_path).parent), exist_ok=True)
-        word_timestamps: list[WordTimestamp] = []
-        async with aiofiles.open(output_path, "wb") as audio_file:
-            async for chunk in self._communicate_factory(text, voice).stream():
-                if chunk["type"] == "audio":
-                    await audio_file.write(cast(bytes, chunk["data"]))
-                elif chunk["type"] == "WordBoundary":
-                    offset = cast(int, chunk["offset"])
-                    duration = cast(int, chunk["duration"])
-                    word_timestamps.append(
-                        WordTimestamp(
-                            word=str(chunk["text"]),
-                            start_seconds=offset / _TICKS_PER_SECOND,
-                            end_seconds=(offset + duration) / _TICKS_PER_SECOND,
+
+        async def _synthesize_once() -> list[WordTimestamp]:
+            word_timestamps: list[WordTimestamp] = []
+            async with aiofiles.open(output_path, "wb") as audio_file:
+                async for chunk in self._communicate_factory(text, voice).stream():
+                    if chunk["type"] == "audio":
+                        await audio_file.write(cast(bytes, chunk["data"]))
+                    elif chunk["type"] == "WordBoundary":
+                        offset = cast(int, chunk["offset"])
+                        duration = cast(int, chunk["duration"])
+                        word_timestamps.append(
+                            WordTimestamp(
+                                word=str(chunk["text"]),
+                                start_seconds=offset / _TICKS_PER_SECOND,
+                                end_seconds=(offset + duration) / _TICKS_PER_SECOND,
+                            )
                         )
-                    )
-        if not word_timestamps:
-            raise ValueError(f"Edge TTS produced no word timestamps for voice '{voice}'.")
-        return word_timestamps
+            if not word_timestamps:
+                raise ValueError(f"Edge TTS produced no word timestamps for voice '{voice}'.")
+            return word_timestamps
+
+        return await retry_with_backoff(
+            _synthesize_once,
+            max_attempts=self._max_attempts,
+            initial_delay_seconds=self._initial_retry_delay_seconds,
+        )
 
 
 class MoviePyTool(IMcpTool):
@@ -209,17 +230,29 @@ class MoviePyTool(IMcpTool):
 class FFmpegTool(IMcpTool):
     """Re-encodes a video into a streaming-ready, fast-start MP4 via FFmpeg."""
 
-    def __init__(self, ffmpeg_path: str | None = None) -> None:
+    def __init__(
+        self,
+        ffmpeg_path: str | None = None,
+        *,
+        max_attempts: int = 3,
+        initial_retry_delay_seconds: float = 1.0,
+    ) -> None:
         """Create the tool with an injectable path to the FFmpeg binary.
 
         Args:
             ffmpeg_path: Path to the FFmpeg executable. Defaults to the static
                 binary bundled by ``imageio_ffmpeg``.
+            max_attempts: Total remux attempts before a transient failure propagates.
+            initial_retry_delay_seconds: Delay before the first retry.
         """
         self._ffmpeg_path = ffmpeg_path or imageio_ffmpeg.get_ffmpeg_exe()
+        self._max_attempts = max_attempts
+        self._initial_retry_delay_seconds = initial_retry_delay_seconds
 
     async def execute(self, **kwargs: object) -> object:
         """Remux ``input_path`` to a fast-start MP4 at ``output_path``.
+
+        Retries the remux with exponential backoff on transient failures.
 
         Args:
             kwargs: Must contain ``input_path`` and ``output_path`` (both ``str``).
@@ -229,27 +262,34 @@ class FFmpegTool(IMcpTool):
 
         Raises:
             TypeError: If a required argument is missing or not a string.
-            RuntimeError: If the FFmpeg process exits with a non-zero status.
         """
         input_path = kwargs.get("input_path")
         output_path = kwargs.get("output_path")
         if not isinstance(input_path, str) or not isinstance(output_path, str):
             raise TypeError("FFmpegTool requires string 'input_path' and 'output_path' arguments.")
         await aiofiles.os.makedirs(str(Path(output_path).parent), exist_ok=True)
-        process = await asyncio.create_subprocess_exec(
-            self._ffmpeg_path,
-            "-y",
-            "-i",
-            input_path,
-            "-c",
-            "copy",
-            "-movflags",
-            "+faststart",
-            output_path,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+
+        async def _remux_once() -> str:
+            process = await asyncio.create_subprocess_exec(
+                self._ffmpeg_path,
+                "-y",
+                "-i",
+                input_path,
+                "-c",
+                "copy",
+                "-movflags",
+                "+faststart",
+                output_path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await process.communicate()
+            if process.returncode != 0:
+                raise RuntimeError(f"FFmpeg exited with code {process.returncode}: {stderr.decode(errors='replace')}")
+            return output_path
+
+        return await retry_with_backoff(
+            _remux_once,
+            max_attempts=self._max_attempts,
+            initial_delay_seconds=self._initial_retry_delay_seconds,
         )
-        _, stderr = await process.communicate()
-        if process.returncode != 0:
-            raise RuntimeError(f"FFmpeg exited with code {process.returncode}: {stderr.decode(errors='replace')}")
-        return output_path

@@ -45,15 +45,20 @@ async def run_video_generation_pipeline(
     session_factory: async_sessionmaker[AsyncSession],
     task_id: UUID,
     graph: CompiledStateGraph[VideoGenerationState],
+    render_semaphore: asyncio.Semaphore,
 ) -> None:
     """Advance a job through the full Intake-to-Publishing stage chain.
+
+    The job stays QUEUED until a render slot is free, so accepting a request
+    ahead of capacity does not spawn unbounded concurrent MoviePy/FFmpeg work.
 
     Args:
         session_factory: Factory that provides isolated background-task sessions.
         task_id: Job to advance through the pipeline.
         graph: Compiled LangGraph pipeline to invoke against the job's state.
+        render_semaphore: Caps how many pipelines run their heavy render stages at once.
     """
-    async with session_factory() as session:
+    async with render_semaphore, session_factory() as session:
         repository = VideoJobRepository(session)
         job = await repository.update_status(task_id, VideoTaskStatus.PROCESSING)
         if job is None:
@@ -118,7 +123,10 @@ async def generate_video(
     schedule_background_task(
         request,
         run_video_generation_pipeline(
-            request.app.state.session_factory, job.id, request.app.state.video_generation_graph
+            request.app.state.session_factory,
+            job.id,
+            request.app.state.video_generation_graph,
+            request.app.state.render_semaphore,
         ),
     )
     return VideoGenerationResponse(task_id=job.id, status=VideoTaskStatus(job.status))

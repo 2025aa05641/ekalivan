@@ -73,7 +73,10 @@ async def test_edge_tts_execute_writes_audio_and_returns_word_timestamps(tmp_pat
 
 async def test_edge_tts_execute_raises_when_no_word_boundaries(tmp_path: Path) -> None:
     """The tool fails explicitly rather than returning an empty timing result."""
-    tool = EdgeTtsTool(communicate_factory=lambda text, voice: _StubCommunicate([{"type": "audio", "data": b"x"}]))
+    tool = EdgeTtsTool(
+        communicate_factory=lambda text, voice: _StubCommunicate([{"type": "audio", "data": b"x"}]),
+        max_attempts=1,
+    )
 
     with pytest.raises(ValueError, match="no word timestamps"):
         await tool.execute(text="Hello", voice="en-US-AriaNeural", output_path=str(tmp_path / "unused.mp3"))
@@ -129,7 +132,7 @@ async def test_ffmpeg_execute_produces_a_faststart_video(tmp_path: Path) -> None
 async def test_ffmpeg_execute_raises_for_missing_input(tmp_path: Path) -> None:
     """The tool raises a clear error when FFmpeg fails to process the input."""
     with pytest.raises(RuntimeError, match="FFmpeg exited"):
-        await FFmpegTool().execute(
+        await FFmpegTool(max_attempts=1).execute(
             input_path=str(tmp_path / "does_not_exist.mp4"), output_path=str(tmp_path / "final.mp4")
         )
 

@@ -4,11 +4,28 @@ import asyncio
 from uuid import UUID
 
 from fastapi import FastAPI
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from tests.conftest import FAILURE_SENTINEL_PATH
+from app.core.interfaces import IMcpTool
+from app.main import create_app
+from tests.conftest import (
+    FAILURE_SENTINEL_PATH,
+    FakeEncodeTool,
+    FakeLlmProvider,
+    FakeParserTool,
+    FakeStorageTool,
+    FakeTtsTool,
+)
 
 _BACKGROUND_TASK_SAFETY_TIMEOUT_SECONDS = 30.0
+
+_GENERATE_PAYLOAD = {
+    "class_level": "6",
+    "subject": "Science",
+    "chapter_title": "The World of Plants",
+    "file_storage_path": "uploads/chapters/science_ch4.pdf",
+}
 
 
 async def _await_generation_and_fetch_status(client: AsyncClient, app: FastAPI, task_id: str) -> dict[str, object]:
@@ -99,3 +116,52 @@ async def test_get_unknown_job_returns_not_found(client: AsyncClient) -> None:
     response = await client.get("/api/v1/videos/00000000-0000-0000-0000-000000000000")
 
     assert response.status_code == 404
+
+
+class _GatedCompositionTool(IMcpTool):
+    """Blocks inside the render stage until released, so a test can observe queuing."""
+
+    def __init__(self) -> None:
+        self.entered = asyncio.Event()
+        self.release = asyncio.Event()
+
+    async def execute(self, **kwargs: object) -> object:
+        self.entered.set()
+        await self.release.wait()
+        return kwargs["output_path"]
+
+
+async def test_generate_caps_concurrent_pipeline_execution(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """A second accepted job stays QUEUED while the single render slot is occupied."""
+    gate = _GatedCompositionTool()
+    app = create_app(
+        session_factory=session_factory,
+        parser_tool=FakeParserTool(),
+        llm_provider=FakeLlmProvider(),
+        tts_tool=FakeTtsTool(),
+        composition_tool=gate,
+        encode_tool=FakeEncodeTool(),
+        storage_tool=FakeStorageTool(),
+        max_concurrent_render_jobs=1,
+    )
+    background_tasks: set[asyncio.Task[None]] = app.state.background_tasks
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        first_response = await client.post("/api/v1/videos/generate", json=_GENERATE_PAYLOAD)
+        second_response = await client.post("/api/v1/videos/generate", json=_GENERATE_PAYLOAD)
+        second_task_id = second_response.json()["task_id"]
+
+        await asyncio.wait_for(gate.entered.wait(), timeout=_BACKGROUND_TASK_SAFETY_TIMEOUT_SECONDS)
+        second_status = await client.get(f"/api/v1/videos/{second_task_id}")
+        assert second_status.json()["status"] == "QUEUED"
+
+        gate.release.set()
+        await asyncio.wait_for(
+            asyncio.gather(*background_tasks, return_exceptions=True), timeout=_BACKGROUND_TASK_SAFETY_TIMEOUT_SECONDS
+        )
+        first_task_id = first_response.json()["task_id"]
+        final_first = await client.get(f"/api/v1/videos/{first_task_id}")
+        final_second = await client.get(f"/api/v1/videos/{second_task_id}")
+        assert final_first.json()["status"] == "COMPLETED"
+        assert final_second.json()["status"] == "COMPLETED"
