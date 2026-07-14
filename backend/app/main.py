@@ -21,6 +21,7 @@ from app.features.video_generator.graph import build_video_generation_graph
 from app.features.video_generator.mcp_tools import EdgeTtsTool, FFmpegTool, MarkItDownTool, MoviePyTool
 from app.features.video_generator.router import router as video_generator_router
 from app.infrastructure.database import create_engine, create_session_factory
+from app.infrastructure.fallback_llm_provider import FallbackLlmProvider
 from app.infrastructure.llm_provider import OllamaProvider
 from app.infrastructure.storage import StorageTool
 
@@ -86,9 +87,18 @@ def create_app(
     app.state.llm_http_client = None
     if llm_provider is None:
         app.state.llm_http_client = httpx.AsyncClient(timeout=settings.ollama_timeout_seconds)
-        llm_provider = OllamaProvider(
+        primary_llm_provider: ILlmProvider = OllamaProvider(
             base_url=settings.ollama_base_url, model=settings.ollama_model, client=app.state.llm_http_client
         )
+        if settings.ollama_fallback_model:
+            fallback_llm_provider = OllamaProvider(
+                base_url=settings.ollama_base_url,
+                model=settings.ollama_fallback_model,
+                client=app.state.llm_http_client,
+            )
+            llm_provider = FallbackLlmProvider([primary_llm_provider, fallback_llm_provider])
+        else:
+            llm_provider = primary_llm_provider
     app.state.video_generation_graph = build_video_generation_graph(
         parser_tool or MarkItDownTool(),
         llm_provider,

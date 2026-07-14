@@ -3,7 +3,7 @@
 from uuid import UUID
 
 from app.features.video_generator.db_models import VideoJob
-from app.features.video_generator.models import VideoGenerationRequest
+from app.features.video_generator.models import JobMetrics, VideoGenerationRequest
 from app.features.video_generator.repository import VideoJobRepository
 
 
@@ -44,3 +44,11 @@ class VideoGenerationService:
             Matching job, or ``None`` if no job exists.
         """
         return await self._repository.get_job(task_id)
+
+    async def get_metrics(self) -> JobMetrics:
+        """Retrieve aggregate job counts and completion timing.
+
+        Returns:
+            Total job count, per-status counts, and mean completion time.
+        """
+        return await self._repository.get_metrics()

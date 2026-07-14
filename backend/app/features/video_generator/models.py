@@ -81,6 +81,14 @@ class JobStatusResponse(BaseModel):
     error_message: str | None = None
 
 
+class JobMetrics(BaseModel):
+    """Aggregate job counters exposed for operational observability."""
+
+    total_jobs: int = Field(ge=0)
+    counts_by_status: dict[str, int]
+    average_completion_seconds: float | None = None
+
+
 class VideoGenerationState(BaseModel):
     """Shared immutable-by-convention state that moves through LangGraph nodes."""
 

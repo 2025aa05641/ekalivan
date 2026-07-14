@@ -118,6 +118,39 @@ async def test_get_unknown_job_returns_not_found(client: AsyncClient) -> None:
     assert response.status_code == 404
 
 
+async def test_metrics_reports_counts_and_average_duration_for_completed_jobs(
+    client: AsyncClient, test_app: FastAPI
+) -> None:
+    """The metrics endpoint aggregates one completed and one failed job correctly."""
+    completed = await client.post("/api/v1/videos/generate", json=_GENERATE_PAYLOAD)
+    await _await_generation_and_fetch_status(client, test_app, completed.json()["task_id"])
+
+    failed = await client.post(
+        "/api/v1/videos/generate",
+        json={**_GENERATE_PAYLOAD, "file_storage_path": FAILURE_SENTINEL_PATH},
+    )
+    await _await_generation_and_fetch_status(client, test_app, failed.json()["task_id"])
+
+    response = await client.get("/api/v1/videos/metrics")
+    payload = response.json()
+
+    assert response.status_code == 200
+    assert payload["total_jobs"] == 2
+    assert payload["counts_by_status"] == {"COMPLETED": 1, "FAILED": 1}
+    assert isinstance(payload["average_completion_seconds"], float)
+    assert payload["average_completion_seconds"] >= 0.0
+
+
+async def test_metrics_reports_no_average_duration_when_nothing_has_completed(client: AsyncClient) -> None:
+    """The average is null rather than a misleading zero when there is no completed job."""
+    response = await client.get("/api/v1/videos/metrics")
+    payload = response.json()
+
+    assert payload["total_jobs"] == 0
+    assert payload["counts_by_status"] == {}
+    assert payload["average_completion_seconds"] is None
+
+
 class _GatedCompositionTool(IMcpTool):
     """Blocks inside the render stage until released, so a test can observe queuing."""
 

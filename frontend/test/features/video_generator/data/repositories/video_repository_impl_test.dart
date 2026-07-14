@@ -3,9 +3,12 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:textbook_video_learning/core/network/api_client.dart';
+import 'package:textbook_video_learning/features/video_generator/data/datasources/local_video_cache.dart';
 import 'package:textbook_video_learning/features/video_generator/data/datasources/video_remote_data_source.dart';
 import 'package:textbook_video_learning/features/video_generator/data/repositories/video_repository_impl.dart';
+import 'package:textbook_video_learning/features/video_generator/domain/entities/video_job_entity.dart';
 import 'package:textbook_video_learning/features/video_generator/domain/entities/video_status_update_entity.dart';
 
 /// Deterministic fake transport returning a scripted sequence of job-status
@@ -48,6 +51,7 @@ VideoRepositoryImpl _repositoryWithScriptedResponses(
   List<String> responses, {
   Set<int> failAtIndices = const <int>{},
   int maxConsecutivePollFailures = 3,
+  LocalVideoCache localCache = const LocalVideoCache(),
 }) {
   final Dio dio = Dio(BaseOptions(baseUrl: 'http://test'))
     ..httpClientAdapter = _ScriptedHttpClientAdapter(responses, failAtIndices: failAtIndices);
@@ -56,10 +60,15 @@ VideoRepositoryImpl _repositoryWithScriptedResponses(
     VideoRemoteDataSource(apiClient),
     pollInterval: const Duration(milliseconds: 1),
     maxConsecutivePollFailures: maxConsecutivePollFailures,
+    localCache: localCache,
   );
 }
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+  });
+
   test('watchGenerationProgress polls until COMPLETED and then stops', () async {
     final VideoRepositoryImpl repository = _repositoryWithScriptedResponses(<String>[
       '{"task_id":"job-1","status":"QUEUED"}',
@@ -76,6 +85,33 @@ void main() {
     ]);
     expect(updates.last.videoUrl, '/static/video/job-1/final.mp4');
     expect(updates.last.progress, 100);
+  });
+
+  test('watchGenerationProgress caches a completed job for offline access', () async {
+    const LocalVideoCache localCache = LocalVideoCache();
+    final VideoRepositoryImpl repository = _repositoryWithScriptedResponses(
+      <String>['{"task_id":"job-1","status":"COMPLETED","video_url":"/static/video/job-1/final.mp4"}'],
+      localCache: localCache,
+    );
+
+    await repository.watchGenerationProgress(taskId: 'job-1').toList();
+    final List<VideoJobEntity> cached = await localCache.getAll();
+
+    expect(cached, hasLength(1));
+    expect(cached.single.taskId, 'job-1');
+    expect(cached.single.videoUrl, '/static/video/job-1/final.mp4');
+  });
+
+  test('watchGenerationProgress does not cache a failed job', () async {
+    const LocalVideoCache localCache = LocalVideoCache();
+    final VideoRepositoryImpl repository = _repositoryWithScriptedResponses(
+      <String>['{"task_id":"job-2","status":"FAILED","error_message":"Simulated failure."}'],
+      localCache: localCache,
+    );
+
+    await repository.watchGenerationProgress(taskId: 'job-2').toList();
+
+    expect(await localCache.getAll(), isEmpty);
   });
 
   test('watchGenerationProgress stops after FAILED and carries the error message', () async {

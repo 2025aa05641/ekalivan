@@ -1,10 +1,11 @@
-/// Repository implementation combining remote data with future local caching.
+/// Repository implementation combining remote data with local offline caching.
 library;
 
 import '../../domain/entities/video_job_entity.dart';
 import '../../domain/entities/video_status_update_entity.dart';
 import '../../domain/repositories/video_repository.dart';
 import '../../domain/value_objects/video_generation_request_params.dart';
+import '../datasources/local_video_cache.dart';
 import '../datasources/video_remote_data_source.dart';
 
 const Set<String> _terminalStatuses = <String>{'COMPLETED', 'FAILED'};
@@ -16,12 +17,15 @@ class VideoRepositoryImpl implements IVideoRepository {
     this._remoteDataSource, {
     Duration pollInterval = const Duration(seconds: 3),
     int maxConsecutivePollFailures = 3,
+    LocalVideoCache localCache = const LocalVideoCache(),
   })  : _pollInterval = pollInterval,
-        _maxConsecutivePollFailures = maxConsecutivePollFailures;
+        _maxConsecutivePollFailures = maxConsecutivePollFailures,
+        _localCache = localCache;
 
   final VideoRemoteDataSource _remoteDataSource;
   final Duration _pollInterval;
   final int _maxConsecutivePollFailures;
+  final LocalVideoCache _localCache;
 
   @override
   Future<VideoJobEntity> requestVideoGeneration({required VideoGenerationRequestParams params}) async {
@@ -29,7 +33,7 @@ class VideoRepositoryImpl implements IVideoRepository {
   }
 
   @override
-  Future<List<VideoJobEntity>> getOfflineCachedVideos() async => <VideoJobEntity>[];
+  Future<List<VideoJobEntity>> getOfflineCachedVideos() => _localCache.getAll();
 
   @override
   Stream<VideoStatusUpdateEntity> watchGenerationProgress({required String taskId}) async* {
@@ -44,6 +48,11 @@ class VideoRepositoryImpl implements IVideoRepository {
         continue;
       }
       consecutiveFailures = 0;
+      if (update.status == 'COMPLETED' && update.videoUrl != null) {
+        await _localCache.saveCompletedJob(
+          VideoJobEntity(taskId: taskId, status: update.status, videoUrl: update.videoUrl),
+        );
+      }
       yield update;
       if (_terminalStatuses.contains(update.status)) {
         return;

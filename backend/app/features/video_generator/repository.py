@@ -2,11 +2,13 @@
 
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.features.video_generator.db_models import VideoJob
 from app.features.video_generator.models import (
     ChapterSection,
+    JobMetrics,
     NarratedBeat,
     ScriptBeat,
     VideoGenerationRequest,
@@ -112,6 +114,29 @@ class VideoJobRepository:
         await self._session.commit()
         await self._session.refresh(job)
         return job
+
+    async def get_metrics(self) -> JobMetrics:
+        """Aggregate job counts and completed-job durations across all persisted jobs.
+
+        Returns:
+            Total job count, per-status counts, and mean completion time in seconds
+            (``None`` when no job has completed yet).
+        """
+        jobs = (await self._session.execute(select(VideoJob))).scalars().all()
+        counts_by_status: dict[str, int] = {}
+        completed_durations: list[float] = []
+        for job in jobs:
+            counts_by_status[job.status] = counts_by_status.get(job.status, 0) + 1
+            if job.status == VideoTaskStatus.COMPLETED.value:
+                completed_durations.append((job.updated_at - job.created_at).total_seconds())
+        average_completion_seconds = (
+            sum(completed_durations) / len(completed_durations) if completed_durations else None
+        )
+        return JobMetrics(
+            total_jobs=len(jobs),
+            counts_by_status=counts_by_status,
+            average_completion_seconds=average_completion_seconds,
+        )
 
     async def mark_failed(self, task_id: UUID, error_message: str) -> VideoJob | None:
         """Record a pipeline failure without raising past the background task.

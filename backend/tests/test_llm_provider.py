@@ -41,7 +41,7 @@ async def test_complete_raises_value_error_on_invalid_json() -> None:
         return httpx.Response(200, json={"response": "not valid json"})
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    provider = OllamaProvider(base_url="http://localhost:11434", model="llama3.1", client=client)
+    provider = OllamaProvider(base_url="http://localhost:11434", model="llama3.1", client=client, max_attempts=1)
 
     with pytest.raises(ValueError, match="failed schema validation"):
         await provider.complete("prompt text", _EchoResponse)
@@ -55,8 +55,35 @@ async def test_complete_raises_for_http_error_status() -> None:
         return httpx.Response(500, text="internal error")
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    provider = OllamaProvider(base_url="http://localhost:11434", model="llama3.1", client=client)
+    provider = OllamaProvider(base_url="http://localhost:11434", model="llama3.1", client=client, max_attempts=1)
 
     with pytest.raises(httpx.HTTPStatusError):
         await provider.complete("prompt text", _EchoResponse)
+    await client.aclose()
+
+
+async def test_complete_retries_after_a_transient_failure() -> None:
+    """A dropped first attempt is retried and a subsequent success is still returned."""
+    attempts = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise httpx.ConnectError("simulated transient network failure")
+        return httpx.Response(200, json={"response": json.dumps({"value": "recovered"})})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    provider = OllamaProvider(
+        base_url="http://localhost:11434",
+        model="llama3.1",
+        client=client,
+        max_attempts=2,
+        initial_retry_delay_seconds=0.01,
+    )
+
+    result = await provider.complete("prompt text", _EchoResponse)
+
+    assert result == _EchoResponse(value="recovered")
+    assert attempts == 2
     await client.aclose()

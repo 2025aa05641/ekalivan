@@ -12,6 +12,7 @@ from langgraph.graph import END
 from langgraph.graph.state import CompiledStateGraph, StateGraph
 
 from app.core.interfaces import ILlmProvider, IMcpTool
+from app.core.telemetry import with_node_telemetry
 from app.features.video_generator.agents import (
     CurriculumAgent,
     LessonPlanningAgent,
@@ -61,17 +62,29 @@ def build_video_generation_graph(
         pacing, localizing, storyboarding, narrating, compositing, and publishing one video.
     """
     graph: StateGraph[VideoGenerationState] = StateGraph(VideoGenerationState)
-    graph.add_node("parser", ParserAgent(parser_tool))
-    graph.add_node("curriculum", CurriculumAgent(CurriculumSkill(llm_provider)))
-    graph.add_node("lesson_planning", LessonPlanningAgent(LessonPlanningSkill(llm_provider)))
-    graph.add_node("teacher", TeacherAgent(TeacherSkill(llm_provider)))
-    graph.add_node("storyboard", StoryboardAgent(StoryboardSkill(llm_provider)))
-    graph.add_node("narration", NarrationAgent(NarrationSkill(tts_tool, narration_output_dir)))
+    graph.add_node("parser", with_node_telemetry("parser", ParserAgent(parser_tool)))
+    graph.add_node("curriculum", with_node_telemetry("curriculum", CurriculumAgent(CurriculumSkill(llm_provider))))
+    graph.add_node(
+        "lesson_planning",
+        with_node_telemetry("lesson_planning", LessonPlanningAgent(LessonPlanningSkill(llm_provider))),
+    )
+    graph.add_node("teacher", with_node_telemetry("teacher", TeacherAgent(TeacherSkill(llm_provider))))
+    graph.add_node("storyboard", with_node_telemetry("storyboard", StoryboardAgent(StoryboardSkill(llm_provider))))
+    graph.add_node(
+        "narration",
+        with_node_telemetry("narration", NarrationAgent(NarrationSkill(tts_tool, narration_output_dir))),
+    )
     graph.add_node(
         "video_rendering",
-        VideoRenderingAgent(RenderingSkill(composition_tool, encode_tool, rendering_output_dir)),
+        with_node_telemetry(
+            "video_rendering",
+            VideoRenderingAgent(RenderingSkill(composition_tool, encode_tool, rendering_output_dir)),
+        ),
     )
-    graph.add_node("publishing", PublishingAgent(PublishingSkill(storage_tool, static_assets_dir)))
+    graph.add_node(
+        "publishing",
+        with_node_telemetry("publishing", PublishingAgent(PublishingSkill(storage_tool, static_assets_dir))),
+    )
     graph.set_entry_point("parser")
     graph.add_edge("parser", "curriculum")
     graph.add_edge("curriculum", "lesson_planning")

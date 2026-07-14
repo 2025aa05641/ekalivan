@@ -13,6 +13,7 @@ from app.core.dependencies import get_db_session
 from app.core.errors import TaskNotFoundError
 from app.features.video_generator.models import (
     ChapterSection,
+    JobMetrics,
     JobStatusResponse,
     NarratedBeat,
     ScriptBeat,
@@ -130,6 +131,19 @@ async def generate_video(
         ),
     )
     return VideoGenerationResponse(task_id=job.id, status=VideoTaskStatus(job.status))
+
+
+@router.get("/metrics", response_model=JobMetrics)
+async def get_video_metrics(service: VideoGenerationService = Depends(get_video_service)) -> JobMetrics:
+    """Return aggregate job counts and completion timing for observability.
+
+    Args:
+        service: Injected job service.
+
+    Returns:
+        Total job count, per-status counts, and mean completion time.
+    """
+    return await service.get_metrics()
 
 
 @router.get("/{task_id}", response_model=JobStatusResponse)

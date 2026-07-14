@@ -2,6 +2,7 @@
 
 import asyncio
 from collections.abc import AsyncIterator
+from pathlib import Path
 
 import pytest_asyncio
 from fastapi import FastAPI
@@ -106,13 +107,25 @@ class FakeStorageTool(IMcpTool):
 
 
 @pytest_asyncio.fixture
-async def session_factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
+async def session_factory(tmp_path: Path) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     """Create an isolated async SQLite database for one test.
+
+    Uses a real file rather than ``:memory:``: an in-memory SQLite database is
+    private to the single connection that created it, so under genuine
+    concurrent access (many sessions opened at once) some connections start
+    from an empty, isolated database, and if forced onto one shared
+    connection instead, overlapping transactions silently lose writes. A
+    file-backed database gives every session its own connection with normal
+    SQLite file-level locking, matching how a real Postgres pool behaves.
+
+    Args:
+        tmp_path: Pytest-provided temporary directory, unique per test.
 
     Yields:
         Async session factory bound to the isolated database.
     """
-    engine: AsyncEngine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    database_path = (tmp_path / "test.db").as_posix()
+    engine: AsyncEngine = create_async_engine(f"sqlite+aiosqlite:///{database_path}")
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
     try:
