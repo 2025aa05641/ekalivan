@@ -5,6 +5,12 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../creator_portal/presentation/screens/admin_dashboard_screen.dart';
+import '../../../creator_portal/presentation/screens/login_screen.dart';
+import '../../../creator_portal/presentation/screens/pipeline_complete_screen.dart';
+import '../../../creator_portal/presentation/screens/pipeline_progress_screen.dart';
+import '../../../creator_portal/presentation/screens/rendering_progress_screen.dart';
+import '../../../creator_portal/presentation/screens/upload_book_screen.dart';
 import '../../domain/entities/video_job_entity.dart';
 import '../screens/cached_video_screen.dart';
 import '../screens/generation_screen.dart';
@@ -23,7 +29,25 @@ enum AppRoute {
   myVideos('/my-videos', 'myVideos'),
 
   /// Playback route for one cached video, given via `extra`.
-  cachedVideo('/my-videos/player', 'cachedVideo');
+  cachedVideo('/my-videos/player', 'cachedVideo'),
+
+  /// Creator portal sign-in.
+  adminLogin('/admin/login', 'adminLogin'),
+
+  /// Creator portal home: metrics and recent activity.
+  adminDashboard('/admin/dashboard', 'adminDashboard'),
+
+  /// Creator portal book upload.
+  adminUpload('/admin/upload', 'adminUpload'),
+
+  /// Creator portal 8-step AI pipeline overview.
+  adminPipeline('/admin/pipeline', 'adminPipeline'),
+
+  /// Creator portal Video Rendering step detail.
+  adminRendering('/admin/pipeline/rendering', 'adminRendering'),
+
+  /// Creator portal pipeline-completed screen.
+  adminComplete('/admin/pipeline/complete', 'adminComplete');
 
   /// Creates a named application route.
   const AppRoute(this.path, this.routeName);
@@ -61,6 +85,36 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>(
         name: AppRoute.cachedVideo.routeName,
         builder: (BuildContext context, GoRouterState state) =>
             CachedVideoScreen(job: state.extra! as VideoJobEntity),
+      ),
+      GoRoute(
+        path: AppRoute.adminLogin.path,
+        name: AppRoute.adminLogin.routeName,
+        builder: (BuildContext context, GoRouterState state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: AppRoute.adminDashboard.path,
+        name: AppRoute.adminDashboard.routeName,
+        builder: (BuildContext context, GoRouterState state) => const AdminDashboardScreen(),
+      ),
+      GoRoute(
+        path: AppRoute.adminUpload.path,
+        name: AppRoute.adminUpload.routeName,
+        builder: (BuildContext context, GoRouterState state) => const UploadBookScreen(),
+      ),
+      GoRoute(
+        path: AppRoute.adminPipeline.path,
+        name: AppRoute.adminPipeline.routeName,
+        builder: (BuildContext context, GoRouterState state) => const PipelineProgressScreen(),
+      ),
+      GoRoute(
+        path: AppRoute.adminRendering.path,
+        name: AppRoute.adminRendering.routeName,
+        builder: (BuildContext context, GoRouterState state) => const RenderingProgressScreen(),
+      ),
+      GoRoute(
+        path: AppRoute.adminComplete.path,
+        name: AppRoute.adminComplete.routeName,
+        builder: (BuildContext context, GoRouterState state) => const PipelineCompleteScreen(),
       ),
     ],
   ),

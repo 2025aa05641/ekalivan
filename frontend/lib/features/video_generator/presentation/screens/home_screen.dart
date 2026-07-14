@@ -41,6 +41,11 @@ class HomeScreen extends StatelessWidget {
             tooltip: 'My Videos',
             onPressed: () => context.pushNamed(AppRoute.myVideos.routeName),
           ),
+          IconButton(
+            icon: const Icon(Icons.admin_panel_settings_outlined),
+            tooltip: 'Creator Portal',
+            onPressed: () => context.pushNamed(AppRoute.adminLogin.routeName),
+          ),
         ],
       ),
       body: const SafeArea(
