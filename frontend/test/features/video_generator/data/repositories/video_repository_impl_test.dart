@@ -12,9 +12,11 @@ import 'package:textbook_video_learning/features/video_generator/domain/entities
 /// bodies, one per GET request, so the repository's real polling loop can be
 /// exercised without a live backend.
 class _ScriptedHttpClientAdapter implements HttpClientAdapter {
-  _ScriptedHttpClientAdapter(this._responses);
+  _ScriptedHttpClientAdapter(this._responses, {Set<int> failAtIndices = const <int>{}})
+      : _failAtIndices = failAtIndices;
 
   final List<String> _responses;
+  final Set<int> _failAtIndices;
   int _callCount = 0;
 
   @override
@@ -23,8 +25,12 @@ class _ScriptedHttpClientAdapter implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
-    final String body = _responses[_callCount.clamp(0, _responses.length - 1)];
+    final int index = _callCount;
     _callCount++;
+    if (_failAtIndices.contains(index)) {
+      throw DioException.connectionError(requestOptions: options, reason: 'Simulated transient network failure.');
+    }
+    final String body = _responses[index.clamp(0, _responses.length - 1)];
     return ResponseBody.fromString(
       body,
       200,
@@ -38,12 +44,18 @@ class _ScriptedHttpClientAdapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
-VideoRepositoryImpl _repositoryWithScriptedResponses(List<String> responses) {
-  final Dio dio = Dio(BaseOptions(baseUrl: 'http://test'))..httpClientAdapter = _ScriptedHttpClientAdapter(responses);
+VideoRepositoryImpl _repositoryWithScriptedResponses(
+  List<String> responses, {
+  Set<int> failAtIndices = const <int>{},
+  int maxConsecutivePollFailures = 3,
+}) {
+  final Dio dio = Dio(BaseOptions(baseUrl: 'http://test'))
+    ..httpClientAdapter = _ScriptedHttpClientAdapter(responses, failAtIndices: failAtIndices);
   final ApiClient apiClient = ApiClient(dio: dio);
   return VideoRepositoryImpl(
     VideoRemoteDataSource(apiClient),
     pollInterval: const Duration(milliseconds: 1),
+    maxConsecutivePollFailures: maxConsecutivePollFailures,
   );
 }
 
@@ -76,5 +88,30 @@ void main() {
 
     expect(updates.last.status, 'FAILED');
     expect(updates.last.errorMessage, 'Simulated failure.');
+  });
+
+  test('a single transient poll failure does not end the stream', () async {
+    final VideoRepositoryImpl repository = _repositoryWithScriptedResponses(
+      <String>[
+        '{"task_id":"job-3","status":"PROCESSING"}',
+        '{"task_id":"job-3","status":"PROCESSING"}',
+        '{"task_id":"job-3","status":"COMPLETED","video_url":"/static/video/job-3/final.mp4"}',
+      ],
+      failAtIndices: <int>{1},
+    );
+
+    final List<VideoStatusUpdateEntity> updates = await repository.watchGenerationProgress(taskId: 'job-3').toList();
+
+    expect(updates.map((VideoStatusUpdateEntity update) => update.status), <String>['PROCESSING', 'COMPLETED']);
+  });
+
+  test('the stream ends in an error once consecutive poll failures exceed the limit', () async {
+    final VideoRepositoryImpl repository = _repositoryWithScriptedResponses(
+      <String>['{"task_id":"job-4","status":"PROCESSING"}'],
+      failAtIndices: <int>{0, 1, 2},
+      maxConsecutivePollFailures: 3,
+    );
+
+    await expectLater(repository.watchGenerationProgress(taskId: 'job-4'), emitsError(isA<StateError>()));
   });
 }

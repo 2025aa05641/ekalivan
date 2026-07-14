@@ -54,11 +54,10 @@ class _GenerationBody extends StatelessWidget {
     if (update.status == 'COMPLETED' && videoUrl != null) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           AccessibleText('Your video is ready!', style: Theme.of(context).textTheme.headlineLarge),
           const SizedBox(height: 16),
-          VideoPlayerView(videoUrl: '$baseUrl$videoUrl'),
+          Expanded(child: Center(child: VideoPlayerView(videoUrl: '$baseUrl$videoUrl'))),
         ],
       );
     }

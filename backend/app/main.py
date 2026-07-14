@@ -1,6 +1,7 @@
 """FastAPI application entry point."""
 
 import asyncio
+import mimetypes
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -22,6 +23,10 @@ from app.features.video_generator.router import router as video_generator_router
 from app.infrastructure.database import create_engine, create_session_factory
 from app.infrastructure.llm_provider import OllamaProvider
 from app.infrastructure.storage import StorageTool
+
+# Windows' registry-backed mimetypes database maps ".mp4" to the non-standard
+# "video/mpeg4", which Chrome's <video> element refuses to play inline.
+mimetypes.add_type("video/mp4", ".mp4")
 
 
 @asynccontextmanager
@@ -99,7 +104,9 @@ def create_app(
         allow_origins=settings.cors_origins,
         allow_credentials=False,
         allow_methods=["GET", "POST"],
-        allow_headers=["Content-Type"],
+        allow_headers=["Content-Type", "Cache-Control", "Range"],
+        expose_headers=["Content-Range", "Accept-Ranges", "Content-Length"],
+        max_age=3600,
     )
     register_exception_handlers(app)
     app.include_router(video_generator_router)
