@@ -9,6 +9,7 @@ import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.core.config import get_settings
@@ -20,6 +21,7 @@ from app.features.video_generator.mcp_tools import EdgeTtsTool, FFmpegTool, Mark
 from app.features.video_generator.router import router as video_generator_router
 from app.infrastructure.database import create_engine, create_session_factory
 from app.infrastructure.llm_provider import OllamaProvider
+from app.infrastructure.storage import StorageTool
 
 
 @asynccontextmanager
@@ -50,6 +52,7 @@ def create_app(
     tts_tool: IMcpTool | None = None,
     composition_tool: IMcpTool | None = None,
     encode_tool: IMcpTool | None = None,
+    storage_tool: IMcpTool | None = None,
 ) -> FastAPI:
     """Build the configured API application for production or test use.
 
@@ -61,11 +64,14 @@ def create_app(
         tts_tool: Narration-stage MCP tool to use in place of ``EdgeTtsTool``.
         composition_tool: Assembly-stage composition MCP tool to use in place of ``MoviePyTool``.
         encode_tool: Assembly-stage encode MCP tool to use in place of ``FFmpegTool``.
+        storage_tool: Publishing-stage MCP tool to use in place of ``StorageTool``.
 
     Returns:
         Fully configured FastAPI application.
     """
     settings = get_settings()
+    static_assets_dir = Path(settings.static_assets_path)
+    static_assets_dir.mkdir(parents=True, exist_ok=True)
     app = FastAPI(title=settings.app_name, debug=settings.app_debug, lifespan=lifespan)
     app.state.engine = engine or create_engine(settings.database_url)
     app.state.owns_engine = engine is None
@@ -80,10 +86,12 @@ def create_app(
         parser_tool or MarkItDownTool(),
         llm_provider,
         tts_tool or EdgeTtsTool(),
-        Path(settings.static_assets_path) / "audio",
+        static_assets_dir / "audio",
         composition_tool or MoviePyTool(),
         encode_tool or FFmpegTool(),
-        Path(settings.static_assets_path) / "video",
+        static_assets_dir / "video",
+        storage_tool or StorageTool(),
+        static_assets_dir,
     )
     app.state.background_tasks = set()
     app.add_middleware(
@@ -95,6 +103,7 @@ def create_app(
     )
     register_exception_handlers(app)
     app.include_router(video_generator_router)
+    app.mount("/static", StaticFiles(directory=static_assets_dir), name="static")
 
     @app.get("/health", tags=["system"])
     async def health() -> JSONResponse:

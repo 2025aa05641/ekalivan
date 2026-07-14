@@ -26,6 +26,7 @@ class VideoJob(Base):
     storyboard_beats: Mapped[list[dict[str, object]] | None] = mapped_column(JSON(), nullable=True)
     narrated_beats: Mapped[list[dict[str, object]] | None] = mapped_column(JSON(), nullable=True)
     output_video_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    video_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text(), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

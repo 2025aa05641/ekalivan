@@ -83,6 +83,7 @@ class VideoJobRepository:
         storyboard_beats: list[ScriptBeat],
         narrated_beats: list[NarratedBeat],
         output_video_path: str,
+        video_url: str,
     ) -> VideoJob | None:
         """Record a successful pipeline result and complete the job.
 
@@ -93,6 +94,7 @@ class VideoJobRepository:
             storyboard_beats: Timed scene beats produced by the Storyboard agent.
             narrated_beats: Narrated, timed scene beats produced by the Narration agent.
             output_video_path: Final video file path produced by the Video Rendering agent.
+            video_url: Public URL produced by the Publishing agent.
 
         Returns:
             Updated job, or ``None`` when the job does not exist.
@@ -106,6 +108,7 @@ class VideoJobRepository:
         job.storyboard_beats = [beat.model_dump() for beat in storyboard_beats]
         job.narrated_beats = [beat.model_dump() for beat in narrated_beats]
         job.output_video_path = output_video_path
+        job.video_url = video_url
         await self._session.commit()
         await self._session.refresh(job)
         return job

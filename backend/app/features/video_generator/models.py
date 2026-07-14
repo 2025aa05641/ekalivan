@@ -77,6 +77,7 @@ class JobStatusResponse(BaseModel):
     storyboard_beats: list[ScriptBeat] | None = None
     narrated_beats: list[NarratedBeat] | None = None
     output_video_path: str | None = None
+    video_url: str | None = None
     error_message: str | None = None
 
 
@@ -90,4 +91,5 @@ class VideoGenerationState(BaseModel):
     storyboard_beats: list[ScriptBeat] = Field(default_factory=list)
     narrated_beats: list[NarratedBeat] = Field(default_factory=list)
     output_video_path: str | None = None
+    video_url: str | None = None
     error_message: str | None = None

@@ -5,6 +5,7 @@ from app.features.video_generator.models import ChapterSection, NarratedBeat, Sc
 from app.features.video_generator.skills.curriculum import CurriculumSkill
 from app.features.video_generator.skills.lesson_planning import LessonPlanningSkill
 from app.features.video_generator.skills.narration import NarrationSkill
+from app.features.video_generator.skills.publishing import PublishingSkill
 from app.features.video_generator.skills.rendering import RenderingSkill
 from app.features.video_generator.skills.storyboard import StoryboardSkill
 from app.features.video_generator.skills.teacher import TeacherSkill
@@ -214,3 +215,32 @@ class VideoRenderingAgent:
             raise ValueError("Video Rendering agent requires narrated_beats from the Narration stage.")
         output_video_path = await self._rendering_skill.render_video(state.narrated_beats, state.task_id)
         return {"output_video_path": output_video_path}
+
+
+class PublishingAgent:
+    """Publishing-stage agent: validates the rendered video and registers its manifest entry."""
+
+    def __init__(self, publishing_skill: PublishingSkill) -> None:
+        """Create the agent with its injected Publishing skill.
+
+        Args:
+            publishing_skill: Skill that validates the final video and writes its manifest entry.
+        """
+        self._publishing_skill = publishing_skill
+
+    async def __call__(self, state: VideoGenerationState) -> dict[str, str]:
+        """Populate ``video_url`` from the state's Video Rendering-stage output.
+
+        Args:
+            state: Current shared pipeline state.
+
+        Returns:
+            Partial state update containing the video's public URL.
+
+        Raises:
+            ValueError: If the Video Rendering stage has not yet produced an output video.
+        """
+        if not state.output_video_path:
+            raise ValueError("Publishing agent requires output_video_path from the Video Rendering stage.")
+        video_url = await self._publishing_skill.publish(state.output_video_path, state.task_id)
+        return {"video_url": video_url}

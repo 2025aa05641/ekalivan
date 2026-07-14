@@ -6,10 +6,11 @@ from app.features.video_generator.models import ChapterSection, NarratedBeat, Sc
 from app.features.video_generator.skills.curriculum import CurriculumSkill
 from app.features.video_generator.skills.lesson_planning import LessonPlanningSkill
 from app.features.video_generator.skills.narration import NarrationSkill
+from app.features.video_generator.skills.publishing import PublishingSkill
 from app.features.video_generator.skills.rendering import RenderingSkill
 from app.features.video_generator.skills.storyboard import StoryboardSkill
 from app.features.video_generator.skills.teacher import TeacherSkill
-from tests.conftest import FakeCompositionTool, FakeEncodeTool, FakeLlmProvider, FakeTtsTool
+from tests.conftest import FakeCompositionTool, FakeEncodeTool, FakeLlmProvider, FakeStorageTool, FakeTtsTool
 
 
 async def test_structure_chapter_returns_sections_from_provider() -> None:
@@ -89,3 +90,13 @@ async def test_render_video_returns_final_path_from_encode_tool(tmp_path: Path) 
     output_video_path = await skill.render_video([narrated_beat], task_id="job-42")
 
     assert output_video_path == str(tmp_path / "job-42" / "final.mp4")
+
+
+async def test_publish_returns_video_url_relative_to_static_assets_dir(tmp_path: Path) -> None:
+    """PublishingSkill derives the public URL from the video path and the static-assets root."""
+    skill = PublishingSkill(FakeStorageTool(), tmp_path)
+    output_video_path = str(tmp_path / "video" / "job-42" / "final.mp4")
+
+    video_url = await skill.publish(output_video_path, task_id="job-42")
+
+    assert video_url == "/static/video/job-42/final.mp4"

@@ -64,6 +64,9 @@ async def test_generate_and_read_job_status(client: AsyncClient, test_app: FastA
     assert narrated_beats[0]["word_timestamps"] == [{"word": "Mock", "start_seconds": 0.0, "end_seconds": 0.5}]
     assert isinstance(completed_payload["output_video_path"], str)
     assert completed_payload["output_video_path"].endswith("final.mp4")
+    assert isinstance(completed_payload["video_url"], str)
+    assert completed_payload["video_url"].startswith("/static/video/")
+    assert completed_payload["video_url"].endswith("/final.mp4")
     assert completed_payload["error_message"] is None
 
 
@@ -87,6 +90,7 @@ async def test_generate_records_pipeline_failure(client: AsyncClient, test_app: 
     assert failed_payload["storyboard_beats"] is None
     assert failed_payload["narrated_beats"] is None
     assert failed_payload["output_video_path"] is None
+    assert failed_payload["video_url"] is None
     assert "Simulated parser failure" in str(failed_payload["error_message"])
 
 

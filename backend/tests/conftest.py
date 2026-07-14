@@ -85,6 +85,26 @@ class FakeEncodeTool(IMcpTool):
         return kwargs["output_path"]
 
 
+class FakeStorageTool(IMcpTool):
+    """Fast, deterministic Publishing-stage stand-in for API-level tests."""
+
+    async def execute(self, **kwargs: object) -> object:
+        """Fake a positive file-size check or a successful write without touching disk.
+
+        Returns:
+            ``1024`` for ``"file_size"``, or ``path`` for ``"write_text"``.
+
+        Raises:
+            ValueError: If ``operation`` is not recognized.
+        """
+        operation = kwargs.get("operation")
+        if operation == "file_size":
+            return 1024
+        if operation == "write_text":
+            return kwargs["path"]
+        raise ValueError(f"FakeStorageTool does not recognize operation '{operation}'.")
+
+
 @pytest_asyncio.fixture
 async def session_factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     """Create an isolated async SQLite database for one test.
@@ -118,6 +138,7 @@ async def test_app(session_factory: async_sessionmaker[AsyncSession]) -> FastAPI
         tts_tool=FakeTtsTool(),
         composition_tool=FakeCompositionTool(),
         encode_tool=FakeEncodeTool(),
+        storage_tool=FakeStorageTool(),
     )
 
 

@@ -1,9 +1,9 @@
 """LangGraph construction for the video-generation pipeline.
 
-Only the Intake, Pedagogy (Curriculum, Lesson Planning, Teacher),
-Storyboarding, Audio & Sync (Narration), and Assembly (Video Rendering)
-stages are wired so far. Publishing, the final agent from the
-architecture document's execution chain, is added in a later sprint.
+All eight agents from the architecture document's execution chain are
+now wired: Intake, Pedagogy (Curriculum, Lesson Planning, Teacher),
+Storyboarding, Audio & Sync (Narration), Assembly (Video Rendering), and
+Publishing.
 """
 
 from pathlib import Path
@@ -17,6 +17,7 @@ from app.features.video_generator.agents import (
     LessonPlanningAgent,
     NarrationAgent,
     ParserAgent,
+    PublishingAgent,
     StoryboardAgent,
     TeacherAgent,
     VideoRenderingAgent,
@@ -25,6 +26,7 @@ from app.features.video_generator.models import VideoGenerationState
 from app.features.video_generator.skills.curriculum import CurriculumSkill
 from app.features.video_generator.skills.lesson_planning import LessonPlanningSkill
 from app.features.video_generator.skills.narration import NarrationSkill
+from app.features.video_generator.skills.publishing import PublishingSkill
 from app.features.video_generator.skills.rendering import RenderingSkill
 from app.features.video_generator.skills.storyboard import StoryboardSkill
 from app.features.video_generator.skills.teacher import TeacherSkill
@@ -38,6 +40,8 @@ def build_video_generation_graph(
     composition_tool: IMcpTool,
     encode_tool: IMcpTool,
     rendering_output_dir: Path,
+    storage_tool: IMcpTool,
+    static_assets_dir: Path,
 ) -> CompiledStateGraph[VideoGenerationState]:
     """Compile the linear video-generation graph.
 
@@ -49,12 +53,12 @@ def build_video_generation_graph(
         composition_tool: MCP tool used by the Video Rendering agent to composite beats (MoviePy).
         encode_tool: MCP tool used by the Video Rendering agent for the final encode (FFmpeg).
         rendering_output_dir: Base directory under which per-job rendered video files are written.
+        storage_tool: MCP tool used by the Publishing agent to validate output and write its manifest.
+        static_assets_dir: Root directory served as static assets, used to derive the public video URL.
 
     Returns:
-        A compiled graph that parses the source file to Markdown, structures it into
-        concept sections, paces and localizes those sections for a Class 6 lesson, turns
-        them into timed storyboard beats, synthesizes narration audio and word timing for
-        each beat, and composites the result into one streaming-ready video.
+        A compiled graph that runs the full Intake-to-Publishing chain: parsing, structuring,
+        pacing, localizing, storyboarding, narrating, compositing, and publishing one video.
     """
     graph: StateGraph[VideoGenerationState] = StateGraph(VideoGenerationState)
     graph.add_node("parser", ParserAgent(parser_tool))
@@ -67,6 +71,7 @@ def build_video_generation_graph(
         "video_rendering",
         VideoRenderingAgent(RenderingSkill(composition_tool, encode_tool, rendering_output_dir)),
     )
+    graph.add_node("publishing", PublishingAgent(PublishingSkill(storage_tool, static_assets_dir)))
     graph.set_entry_point("parser")
     graph.add_edge("parser", "curriculum")
     graph.add_edge("curriculum", "lesson_planning")
@@ -74,5 +79,6 @@ def build_video_generation_graph(
     graph.add_edge("teacher", "storyboard")
     graph.add_edge("storyboard", "narration")
     graph.add_edge("narration", "video_rendering")
-    graph.add_edge("video_rendering", END)
+    graph.add_edge("video_rendering", "publishing")
+    graph.add_edge("publishing", END)
     return graph.compile()

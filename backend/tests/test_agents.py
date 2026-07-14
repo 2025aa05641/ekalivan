@@ -8,6 +8,7 @@ from app.features.video_generator.agents import (
     LessonPlanningAgent,
     NarrationAgent,
     ParserAgent,
+    PublishingAgent,
     StoryboardAgent,
     TeacherAgent,
     VideoRenderingAgent,
@@ -16,10 +17,11 @@ from app.features.video_generator.models import ChapterSection, NarratedBeat, Sc
 from app.features.video_generator.skills.curriculum import CurriculumSkill
 from app.features.video_generator.skills.lesson_planning import LessonPlanningSkill
 from app.features.video_generator.skills.narration import NarrationSkill
+from app.features.video_generator.skills.publishing import PublishingSkill
 from app.features.video_generator.skills.rendering import RenderingSkill
 from app.features.video_generator.skills.storyboard import StoryboardSkill
 from app.features.video_generator.skills.teacher import TeacherSkill
-from tests.conftest import FakeCompositionTool, FakeEncodeTool, FakeLlmProvider, FakeTtsTool
+from tests.conftest import FakeCompositionTool, FakeEncodeTool, FakeLlmProvider, FakeStorageTool, FakeTtsTool
 
 
 class _StubParserTool(IMcpTool):
@@ -186,4 +188,25 @@ async def test_video_rendering_agent_requires_narrated_beats(tmp_path) -> None:
     state = VideoGenerationState(file_path="x.pdf", task_id="job-1")
 
     with pytest.raises(ValueError, match="Narration stage"):
+        await agent(state)
+
+
+async def test_publishing_agent_returns_video_url(tmp_path) -> None:
+    """The agent maps the Publishing skill's result onto the video_url state field."""
+    agent = PublishingAgent(PublishingSkill(FakeStorageTool(), tmp_path))
+    state = VideoGenerationState(
+        file_path="x.pdf", task_id="job-1", output_video_path=str(tmp_path / "video" / "job-1" / "final.mp4")
+    )
+
+    update = await agent(state)
+
+    assert update == {"video_url": "/static/video/job-1/final.mp4"}
+
+
+async def test_publishing_agent_requires_output_video_path(tmp_path) -> None:
+    """The agent fails explicitly when the Video Rendering stage has not run yet."""
+    agent = PublishingAgent(PublishingSkill(FakeStorageTool(), tmp_path))
+    state = VideoGenerationState(file_path="x.pdf", task_id="job-1")
+
+    with pytest.raises(ValueError, match="Video Rendering stage"):
         await agent(state)
