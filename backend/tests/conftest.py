@@ -69,6 +69,22 @@ class FakeTtsTool(IMcpTool):
         return [WordTimestamp(word="Mock", start_seconds=0.0, end_seconds=0.5)]
 
 
+class FakeCompositionTool(IMcpTool):
+    """Fast, deterministic composition stand-in for API-level tests."""
+
+    async def execute(self, **kwargs: object) -> object:
+        """Return the requested output path without touching MoviePy or disk."""
+        return kwargs["output_path"]
+
+
+class FakeEncodeTool(IMcpTool):
+    """Fast, deterministic encode stand-in for API-level tests."""
+
+    async def execute(self, **kwargs: object) -> object:
+        """Return the requested output path without touching FFmpeg or disk."""
+        return kwargs["output_path"]
+
+
 @pytest_asyncio.fixture
 async def session_factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     """Create an isolated async SQLite database for one test.
@@ -100,6 +116,8 @@ async def test_app(session_factory: async_sessionmaker[AsyncSession]) -> FastAPI
         parser_tool=FakeParserTool(),
         llm_provider=FakeLlmProvider(),
         tts_tool=FakeTtsTool(),
+        composition_tool=FakeCompositionTool(),
+        encode_tool=FakeEncodeTool(),
     )
 
 

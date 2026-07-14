@@ -16,7 +16,7 @@ from app.core.errors import register_exception_handlers
 from app.core.interfaces import ILlmProvider, IMcpTool
 from app.core.logging import configure_logging
 from app.features.video_generator.graph import build_video_generation_graph
-from app.features.video_generator.mcp_tools import EdgeTtsTool, MarkItDownTool
+from app.features.video_generator.mcp_tools import EdgeTtsTool, FFmpegTool, MarkItDownTool, MoviePyTool
 from app.features.video_generator.router import router as video_generator_router
 from app.infrastructure.database import create_engine, create_session_factory
 from app.infrastructure.llm_provider import OllamaProvider
@@ -48,6 +48,8 @@ def create_app(
     parser_tool: IMcpTool | None = None,
     llm_provider: ILlmProvider | None = None,
     tts_tool: IMcpTool | None = None,
+    composition_tool: IMcpTool | None = None,
+    encode_tool: IMcpTool | None = None,
 ) -> FastAPI:
     """Build the configured API application for production or test use.
 
@@ -57,6 +59,8 @@ def create_app(
         parser_tool: Intake-stage MCP tool to use in place of ``MarkItDownTool``.
         llm_provider: LLM provider to use in place of one built from settings (``OllamaProvider``).
         tts_tool: Narration-stage MCP tool to use in place of ``EdgeTtsTool``.
+        composition_tool: Assembly-stage composition MCP tool to use in place of ``MoviePyTool``.
+        encode_tool: Assembly-stage encode MCP tool to use in place of ``FFmpegTool``.
 
     Returns:
         Fully configured FastAPI application.
@@ -77,6 +81,9 @@ def create_app(
         llm_provider,
         tts_tool or EdgeTtsTool(),
         Path(settings.static_assets_path) / "audio",
+        composition_tool or MoviePyTool(),
+        encode_tool or FFmpegTool(),
+        Path(settings.static_assets_path) / "video",
     )
     app.state.background_tasks = set()
     app.add_middleware(

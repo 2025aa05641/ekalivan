@@ -10,14 +10,16 @@ from app.features.video_generator.agents import (
     ParserAgent,
     StoryboardAgent,
     TeacherAgent,
+    VideoRenderingAgent,
 )
 from app.features.video_generator.models import ChapterSection, NarratedBeat, ScriptBeat, VideoGenerationState
 from app.features.video_generator.skills.curriculum import CurriculumSkill
 from app.features.video_generator.skills.lesson_planning import LessonPlanningSkill
 from app.features.video_generator.skills.narration import NarrationSkill
+from app.features.video_generator.skills.rendering import RenderingSkill
 from app.features.video_generator.skills.storyboard import StoryboardSkill
 from app.features.video_generator.skills.teacher import TeacherSkill
-from tests.conftest import FakeLlmProvider, FakeTtsTool
+from tests.conftest import FakeCompositionTool, FakeEncodeTool, FakeLlmProvider, FakeTtsTool
 
 
 class _StubParserTool(IMcpTool):
@@ -162,4 +164,26 @@ async def test_narration_agent_requires_storyboard_beats(tmp_path) -> None:
     state = VideoGenerationState(file_path="x.pdf", task_id="job-1")
 
     with pytest.raises(ValueError, match="Storyboard stage"):
+        await agent(state)
+
+
+async def test_video_rendering_agent_returns_output_video_path(tmp_path) -> None:
+    """The agent maps the Rendering skill's result onto the output_video_path state field."""
+    agent = VideoRenderingAgent(RenderingSkill(FakeCompositionTool(), FakeEncodeTool(), tmp_path))
+    narrated_beat = NarratedBeat(
+        narration="Plants make food.", visual_prompt="A sunlit leaf.", duration_seconds=4.0, audio_path="beat.mp3"
+    )
+    state = VideoGenerationState(file_path="x.pdf", task_id="job-1", narrated_beats=[narrated_beat])
+
+    update = await agent(state)
+
+    assert update == {"output_video_path": str(tmp_path / "job-1" / "final.mp4")}
+
+
+async def test_video_rendering_agent_requires_narrated_beats(tmp_path) -> None:
+    """The agent fails explicitly when the Narration stage has not run yet."""
+    agent = VideoRenderingAgent(RenderingSkill(FakeCompositionTool(), FakeEncodeTool(), tmp_path))
+    state = VideoGenerationState(file_path="x.pdf", task_id="job-1")
+
+    with pytest.raises(ValueError, match="Narration stage"):
         await agent(state)

@@ -76,6 +76,7 @@ class JobStatusResponse(BaseModel):
     sections: list[ChapterSection] | None = None
     storyboard_beats: list[ScriptBeat] | None = None
     narrated_beats: list[NarratedBeat] | None = None
+    output_video_path: str | None = None
     error_message: str | None = None
 
 

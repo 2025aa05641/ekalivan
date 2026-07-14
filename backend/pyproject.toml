@@ -14,8 +14,10 @@ dependencies = [
   "edge-tts>=7.0,<8.0",
   "fastapi>=0.115,<1.0",
   "httpx>=0.28,<1.0",
+  "imageio-ffmpeg>=0.5,<1.0",
   "langgraph>=0.2,<1.0",
   "markitdown>=0.1.1,<1.0",
+  "moviepy>=2.0,<3.0",
   "pydantic-settings>=2.7,<3.0",
   "pyyaml>=6.0,<7.0",
   "sqlalchemy[asyncio]>=2.0.36,<3.0",
@@ -57,6 +59,10 @@ python_version = "3.12"
 strict = true
 warn_unreachable = true
 disallow_any_generics = true
+
+[[tool.mypy.overrides]]
+module = ["moviepy", "moviepy.*", "imageio_ffmpeg", "imageio_ffmpeg.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

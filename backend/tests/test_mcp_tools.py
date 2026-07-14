@@ -5,10 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from app.features.video_generator.mcp_tools import EdgeTtsTool, MarkItDownTool
+from app.features.video_generator.mcp_tools import EdgeTtsTool, FFmpegTool, MarkItDownTool, MoviePyTool
 from app.features.video_generator.models import WordTimestamp
 
 FIXTURE_PATH = str(Path(__file__).parent / "fixtures" / "sample_chapter.txt")
+SILENT_AUDIO_FIXTURE_PATH = str(Path(__file__).parent / "fixtures" / "silent_beat.wav")
 
 
 async def test_execute_converts_file_to_markdown() -> None:
@@ -84,3 +85,56 @@ async def test_edge_tts_execute_requires_string_arguments() -> None:
 
     with pytest.raises(TypeError):
         await tool.execute(text="Hello", voice="en-US-AriaNeural")
+
+
+_TEST_BEATS = [
+    {"narration": "Plants make their own food.", "audio_path": SILENT_AUDIO_FIXTURE_PATH},
+    {"narration": "They use sunlight to do it.", "audio_path": SILENT_AUDIO_FIXTURE_PATH},
+]
+
+
+async def test_moviepy_execute_composites_beats_into_a_video(tmp_path: Path) -> None:
+    """The tool writes one real, playable video composed from multiple beats."""
+    tool = MoviePyTool(video_size=(320, 240), fps=10)
+    output_path = tmp_path / "nested" / "composed.mp4"
+
+    result = await tool.execute(beats=_TEST_BEATS, output_path=str(output_path))
+
+    assert result == str(output_path)
+    assert output_path.exists()
+    assert output_path.stat().st_size > 0
+
+
+async def test_moviepy_execute_requires_beats_and_output_path() -> None:
+    """The tool rejects a missing/empty 'beats' list or a non-string 'output_path'."""
+    tool = MoviePyTool()
+
+    with pytest.raises(TypeError):
+        await tool.execute(beats=[], output_path="unused.mp4")
+
+
+async def test_ffmpeg_execute_produces_a_faststart_video(tmp_path: Path) -> None:
+    """The tool remuxes a real composed video into a fast-start MP4."""
+    composed_path = tmp_path / "composed.mp4"
+    await MoviePyTool(video_size=(320, 240), fps=10).execute(beats=_TEST_BEATS, output_path=str(composed_path))
+    final_path = tmp_path / "final.mp4"
+
+    result = await FFmpegTool().execute(input_path=str(composed_path), output_path=str(final_path))
+
+    assert result == str(final_path)
+    assert final_path.exists()
+    assert final_path.stat().st_size > 0
+
+
+async def test_ffmpeg_execute_raises_for_missing_input(tmp_path: Path) -> None:
+    """The tool raises a clear error when FFmpeg fails to process the input."""
+    with pytest.raises(RuntimeError, match="FFmpeg exited"):
+        await FFmpegTool().execute(
+            input_path=str(tmp_path / "does_not_exist.mp4"), output_path=str(tmp_path / "final.mp4")
+        )
+
+
+async def test_ffmpeg_execute_requires_string_arguments() -> None:
+    """The tool rejects a missing or non-string 'input_path'/'output_path' argument."""
+    with pytest.raises(TypeError):
+        await FFmpegTool().execute(input_path="only_one_argument.mp4")

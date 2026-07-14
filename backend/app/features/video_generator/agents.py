@@ -5,6 +5,7 @@ from app.features.video_generator.models import ChapterSection, NarratedBeat, Sc
 from app.features.video_generator.skills.curriculum import CurriculumSkill
 from app.features.video_generator.skills.lesson_planning import LessonPlanningSkill
 from app.features.video_generator.skills.narration import NarrationSkill
+from app.features.video_generator.skills.rendering import RenderingSkill
 from app.features.video_generator.skills.storyboard import StoryboardSkill
 from app.features.video_generator.skills.teacher import TeacherSkill
 
@@ -184,3 +185,32 @@ class NarrationAgent:
             for index, beat in enumerate(state.storyboard_beats)
         ]
         return {"narrated_beats": narrated_beats}
+
+
+class VideoRenderingAgent:
+    """Assembly-stage agent: composites narrated beats into the final video."""
+
+    def __init__(self, rendering_skill: RenderingSkill) -> None:
+        """Create the agent with its injected Rendering skill.
+
+        Args:
+            rendering_skill: Skill that coordinates MoviePy composition and FFmpeg encoding.
+        """
+        self._rendering_skill = rendering_skill
+
+    async def __call__(self, state: VideoGenerationState) -> dict[str, str]:
+        """Populate ``output_video_path`` from the state's Narration-stage output.
+
+        Args:
+            state: Current shared pipeline state.
+
+        Returns:
+            Partial state update containing the final video's file path.
+
+        Raises:
+            ValueError: If the Narration stage has not yet produced narrated beats.
+        """
+        if not state.narrated_beats:
+            raise ValueError("Video Rendering agent requires narrated_beats from the Narration stage.")
+        output_video_path = await self._rendering_skill.render_video(state.narrated_beats, state.task_id)
+        return {"output_video_path": output_video_path}

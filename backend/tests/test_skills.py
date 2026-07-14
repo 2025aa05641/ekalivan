@@ -6,9 +6,10 @@ from app.features.video_generator.models import ChapterSection, NarratedBeat, Sc
 from app.features.video_generator.skills.curriculum import CurriculumSkill
 from app.features.video_generator.skills.lesson_planning import LessonPlanningSkill
 from app.features.video_generator.skills.narration import NarrationSkill
+from app.features.video_generator.skills.rendering import RenderingSkill
 from app.features.video_generator.skills.storyboard import StoryboardSkill
 from app.features.video_generator.skills.teacher import TeacherSkill
-from tests.conftest import FakeLlmProvider, FakeTtsTool
+from tests.conftest import FakeCompositionTool, FakeEncodeTool, FakeLlmProvider, FakeTtsTool
 
 
 async def test_structure_chapter_returns_sections_from_provider() -> None:
@@ -76,3 +77,15 @@ async def test_narrate_beat_returns_narrated_beat_from_tool(tmp_path: Path) -> N
         audio_path=str(tmp_path / "job-42" / "beat_002.mp3"),
         word_timestamps=[{"word": "Mock", "start_seconds": 0.0, "end_seconds": 0.5}],
     )
+
+
+async def test_render_video_returns_final_path_from_encode_tool(tmp_path: Path) -> None:
+    """RenderingSkill runs composition then encode and returns the final video path."""
+    skill = RenderingSkill(FakeCompositionTool(), FakeEncodeTool(), tmp_path)
+    narrated_beat = NarratedBeat(
+        narration="Plants make food.", visual_prompt="A sunlit leaf.", duration_seconds=4.0, audio_path="beat.mp3"
+    )
+
+    output_video_path = await skill.render_video([narrated_beat], task_id="job-42")
+
+    assert output_video_path == str(tmp_path / "job-42" / "final.mp4")

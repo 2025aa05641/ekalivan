@@ -46,7 +46,7 @@ async def run_video_generation_pipeline(
     task_id: UUID,
     graph: CompiledStateGraph[VideoGenerationState],
 ) -> None:
-    """Advance a job through the Intake, Pedagogy, Storyboarding, and Audio & Sync stages.
+    """Advance a job through the full Intake-to-Assembly stage chain.
 
     Args:
         session_factory: Factory that provides isolated background-task sessions.
@@ -70,11 +70,17 @@ async def run_video_generation_pipeline(
             or not result.sections
             or not result.storyboard_beats
             or not result.narrated_beats
+            or result.output_video_path is None
         ):
             await repository.mark_failed(task_id, "Pipeline completed without producing the expected content.")
             return
         await repository.mark_completed(
-            task_id, result.markdown_content, result.sections, result.storyboard_beats, result.narrated_beats
+            task_id,
+            result.markdown_content,
+            result.sections,
+            result.storyboard_beats,
+            result.narrated_beats,
+            result.output_video_path,
         )
 
 
@@ -148,5 +154,6 @@ async def get_video_job_status(
         sections=sections,
         storyboard_beats=storyboard_beats,
         narrated_beats=narrated_beats,
+        output_video_path=job.output_video_path,
         error_message=job.error_message,
     )
