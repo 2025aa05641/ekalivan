@@ -1,10 +1,13 @@
-/// Riverpod async state for requesting a video generation task.
+/// Riverpod async state for requesting and observing a video generation task.
+library;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../data/datasources/video_remote_data_source.dart';
 import '../../data/repositories/video_repository_impl.dart';
 import '../../domain/entities/video_job_entity.dart';
+import '../../domain/entities/video_status_update_entity.dart';
 import '../../domain/repositories/video_repository.dart';
 import '../../domain/value_objects/video_generation_request_params.dart';
 
@@ -16,7 +19,7 @@ final Provider<IVideoRepository> videoRepositoryProvider = Provider<IVideoReposi
   (Ref ref) => VideoRepositoryImpl(VideoRemoteDataSource(ref.watch(apiClientProvider))),
 );
 
-/// Owns the async request lifecycle displayed by generation screens in later sprints.
+/// Owns the async request lifecycle for accepting a new generation job.
 final AsyncNotifierProvider<VideoGenerationNotifier, VideoJobEntity?> videoGenerationProvider =
     AsyncNotifierProvider<VideoGenerationNotifier, VideoJobEntity?>(VideoGenerationNotifier.new);
 
@@ -33,3 +36,9 @@ class VideoGenerationNotifier extends AsyncNotifier<VideoJobEntity?> {
     );
   }
 }
+
+/// Observes a single job's status until it reaches a terminal state.
+final StreamProviderFamily<VideoStatusUpdateEntity, String> videoProgressProvider =
+    StreamProvider.family<VideoStatusUpdateEntity, String>(
+  (Ref ref, String taskId) => ref.watch(videoRepositoryProvider).watchGenerationProgress(taskId: taskId),
+);

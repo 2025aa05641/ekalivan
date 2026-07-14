@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     app_host: str = "0.0.0.0"
     app_port: int = Field(default=8000, ge=1, le=65535)
     log_level: str = "INFO"
-    allowed_origins: str = "http://localhost:3000,http://localhost:8080"
+    allowed_origins: str = "http://localhost:3000,http://localhost:8080,http://localhost:5057"
     static_assets_path: str = "rendered"
     database_url: str = "postgresql+asyncpg://textbook_video:textbook_video@localhost:5432/textbook_video"
     ollama_base_url: str = "http://localhost:11434"

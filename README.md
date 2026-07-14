@@ -22,7 +22,7 @@ This repository contains the Sprint 0 foundation for the platform defined in the
 - `frontend/`: Flutter client using feature-first Clean Architecture, Riverpod for observed async state, Dio for networking, and GoRouter named routes.
 - `mcp_demo/`: Existing exploratory notebook; it is not part of the production application.
 
-Sprint 1 persists accepted generation jobs and runs a background status lifecycle. Sprint 2 wires the Intake stage (MarkItDown) into a real LangGraph pipeline. Sprints 3–4 add the Pedagogy stages — Curriculum, Lesson Planning, and Teacher — each an LLM-backed node calling a local Ollama server through the LLM Provider Layer. Sprint 5 adds the Storyboard stage, turning localized narration into timed scene beats. Sprint 6 adds the Narration stage, synthesizing per-beat audio and word-level timestamps via Edge TTS. Sprint 7 adds the Assembly stage, compositing narrated beats into one streaming-ready MP4 via MoviePy and FFmpeg. Sprint 8 adds the Publishing stage, validating that video and serving it over HTTP with a cache-manifest entry — every agent in the architecture document's chain is now wired, and the pipeline goes from a raw PDF to a real, HTTP-servable video end to end.
+Sprint 1 persists accepted generation jobs and runs a background status lifecycle. Sprint 2 wires the Intake stage (MarkItDown) into a real LangGraph pipeline. Sprints 3–4 add the Pedagogy stages — Curriculum, Lesson Planning, and Teacher — each an LLM-backed node calling a local Ollama server through the LLM Provider Layer. Sprint 5 adds the Storyboard stage, turning localized narration into timed scene beats. Sprint 6 adds the Narration stage, synthesizing per-beat audio and word-level timestamps via Edge TTS. Sprint 7 adds the Assembly stage, compositing narrated beats into one streaming-ready MP4 via MoviePy and FFmpeg. Sprint 8 adds the Publishing stage, validating that video and serving it over HTTP with a cache-manifest entry — every agent in the architecture document's chain is now wired, and the pipeline goes from a raw PDF to a real, HTTP-servable video end to end. Sprint 9 wires the Flutter client to that pipeline: the Home screen requests generation, polls status, and plays the finished video — the app is usable end to end for the first time, from a fixed demo chapter rather than a real chapter catalog.
 
 ## Run the backend
 
@@ -96,6 +96,14 @@ flutter test
 ```
 
 For an Android emulator, replace `localhost` with the host alias appropriate to that emulator (commonly `10.0.2.2`).
+
+To run in a browser instead, the dev server's origin must be in the backend's `ALLOWED_ORIGINS` (the default already includes `http://localhost:5057`):
+
+```bash
+flutter run -d chrome --web-port=5057 --dart-define=API_BASE_URL=http://localhost:8000
+```
+
+The Home screen currently starts generation from one fixed, working chapter file (`backend/tests/fixtures/sample_chapter.txt`) rather than a real chapter catalog — there is no backend endpoint yet to list available chapters, only to generate from a known `file_storage_path`. The Mathematics card is shown disabled ("Coming soon") rather than wired to placeholder or mismatched content.
 
 ## API contract
 
