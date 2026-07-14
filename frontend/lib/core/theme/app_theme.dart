@@ -1,30 +1,37 @@
-/// High-contrast theme tokens for child-first learning screens.
+/// Ekalivan theme: blue/purple palette, Poppins typography, and the custom
+/// design tokens in [EkalivanThemeExtension].
+///
+/// Source of truth: `frontend/Mockup/UI_DESIGN_SYSTEM.md` and
+/// `frontend/Mockup/MockupImages.JPEG`.
+library;
+
 import 'package:flutter/material.dart';
+
+import 'app_colors.dart';
+import 'app_theme_extension.dart';
+import 'app_typography.dart';
 
 /// Creates the shared visual language for the client.
 abstract final class AppTheme {
-  /// High-contrast light theme with readable typography and large touch targets.
+  /// Light theme built from the Ekalivan brand palette and typography.
   static ThemeData get lightTheme {
     const colorScheme = ColorScheme.light(
-      primary: Color(0xFF075985),
+      primary: AppColors.primaryBlue,
       onPrimary: Colors.white,
-      secondary: Color(0xFFF97316),
+      secondary: AppColors.primaryPurple,
       onSecondary: Colors.white,
-      surface: Color(0xFFF8FAFC),
+      surface: AppColors.background,
       onSurface: Color(0xFF0F172A),
-      error: Color(0xFFB91C1C),
+      error: AppColors.danger,
       onError: Colors.white,
     );
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: colorScheme.surface,
-      textTheme: const TextTheme(
-        headlineLarge: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, height: 1.25),
-        bodyLarge: TextStyle(fontSize: 16, height: 1.5),
-        bodyMedium: TextStyle(fontSize: 16, height: 1.5),
-      ),
-      cardTheme: const CardThemeData(elevation: 0, margin: EdgeInsets.zero),
+      textTheme: AppTypography.textTheme(colorScheme.onSurface),
+      cardTheme: const CardThemeData(elevation: 0, margin: EdgeInsets.zero, color: AppColors.card),
+      extensions: const <ThemeExtension<dynamic>>[EkalivanThemeExtension.standard],
     );
   }
 }
