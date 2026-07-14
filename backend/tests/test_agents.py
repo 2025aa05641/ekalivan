@@ -6,16 +6,18 @@ from app.core.interfaces import IMcpTool
 from app.features.video_generator.agents import (
     CurriculumAgent,
     LessonPlanningAgent,
+    NarrationAgent,
     ParserAgent,
     StoryboardAgent,
     TeacherAgent,
 )
-from app.features.video_generator.models import ChapterSection, ScriptBeat, VideoGenerationState
+from app.features.video_generator.models import ChapterSection, NarratedBeat, ScriptBeat, VideoGenerationState
 from app.features.video_generator.skills.curriculum import CurriculumSkill
 from app.features.video_generator.skills.lesson_planning import LessonPlanningSkill
+from app.features.video_generator.skills.narration import NarrationSkill
 from app.features.video_generator.skills.storyboard import StoryboardSkill
 from app.features.video_generator.skills.teacher import TeacherSkill
-from tests.conftest import FakeLlmProvider
+from tests.conftest import FakeLlmProvider, FakeTtsTool
 
 
 class _StubParserTool(IMcpTool):
@@ -31,8 +33,9 @@ class _StubParserTool(IMcpTool):
 async def test_parser_agent_returns_markdown_content() -> None:
     """The agent maps a successful tool result onto the Markdown state field."""
     agent = ParserAgent(_StubParserTool("# The World of Plants"))
+    state = VideoGenerationState(file_path="tests/fixtures/sample_chapter.txt", task_id="job-1")
 
-    update = await agent(VideoGenerationState(file_path="tests/fixtures/sample_chapter.txt"))
+    update = await agent(state)
 
     assert update == {"markdown_content": "# The World of Plants"}
 
@@ -40,15 +43,16 @@ async def test_parser_agent_returns_markdown_content() -> None:
 async def test_parser_agent_rejects_blank_content() -> None:
     """The agent fails explicitly rather than advancing the pipeline with empty content."""
     agent = ParserAgent(_StubParserTool("   "))
+    state = VideoGenerationState(file_path="tests/fixtures/sample_chapter.txt", task_id="job-1")
 
     with pytest.raises(ValueError, match="no content"):
-        await agent(VideoGenerationState(file_path="tests/fixtures/sample_chapter.txt"))
+        await agent(state)
 
 
 async def test_curriculum_agent_returns_sections() -> None:
     """The agent maps the Curriculum skill's result onto the sections state field."""
     agent = CurriculumAgent(CurriculumSkill(FakeLlmProvider()))
-    state = VideoGenerationState(file_path="x.pdf", markdown_content="# The World of Plants")
+    state = VideoGenerationState(file_path="x.pdf", task_id="job-1", markdown_content="# The World of Plants")
 
     update = await agent(state)
 
@@ -58,7 +62,7 @@ async def test_curriculum_agent_returns_sections() -> None:
 async def test_curriculum_agent_requires_markdown_content() -> None:
     """The agent fails explicitly when the Intake stage has not run yet."""
     agent = CurriculumAgent(CurriculumSkill(FakeLlmProvider()))
-    state = VideoGenerationState(file_path="x.pdf")
+    state = VideoGenerationState(file_path="x.pdf", task_id="job-1")
 
     with pytest.raises(ValueError, match="markdown_content"):
         await agent(state)
@@ -67,7 +71,9 @@ async def test_curriculum_agent_requires_markdown_content() -> None:
 async def test_lesson_planning_agent_returns_paced_sections() -> None:
     """The agent maps the Lesson Planning skill's result onto the sections state field."""
     agent = LessonPlanningAgent(LessonPlanningSkill(FakeLlmProvider()))
-    state = VideoGenerationState(file_path="x.pdf", sections=[ChapterSection(title="Raw", content="Raw content.")])
+    state = VideoGenerationState(
+        file_path="x.pdf", task_id="job-1", sections=[ChapterSection(title="Raw", content="Raw content.")]
+    )
 
     update = await agent(state)
 
@@ -77,7 +83,7 @@ async def test_lesson_planning_agent_returns_paced_sections() -> None:
 async def test_lesson_planning_agent_requires_sections() -> None:
     """The agent fails explicitly when the Curriculum stage has not run yet."""
     agent = LessonPlanningAgent(LessonPlanningSkill(FakeLlmProvider()))
-    state = VideoGenerationState(file_path="x.pdf")
+    state = VideoGenerationState(file_path="x.pdf", task_id="job-1")
 
     with pytest.raises(ValueError, match="Curriculum stage"):
         await agent(state)
@@ -86,7 +92,9 @@ async def test_lesson_planning_agent_requires_sections() -> None:
 async def test_teacher_agent_returns_localized_sections() -> None:
     """The agent maps the Teacher skill's result onto the sections state field."""
     agent = TeacherAgent(TeacherSkill(FakeLlmProvider()))
-    state = VideoGenerationState(file_path="x.pdf", sections=[ChapterSection(title="Paced", content="Paced content.")])
+    state = VideoGenerationState(
+        file_path="x.pdf", task_id="job-1", sections=[ChapterSection(title="Paced", content="Paced content.")]
+    )
 
     update = await agent(state)
 
@@ -96,7 +104,7 @@ async def test_teacher_agent_returns_localized_sections() -> None:
 async def test_teacher_agent_requires_sections() -> None:
     """The agent fails explicitly when the Lesson Planning stage has not run yet."""
     agent = TeacherAgent(TeacherSkill(FakeLlmProvider()))
-    state = VideoGenerationState(file_path="x.pdf")
+    state = VideoGenerationState(file_path="x.pdf", task_id="job-1")
 
     with pytest.raises(ValueError, match="Lesson Planning stage"):
         await agent(state)
@@ -106,7 +114,7 @@ async def test_storyboard_agent_returns_beats() -> None:
     """The agent maps the Storyboard skill's result onto the storyboard_beats state field."""
     agent = StoryboardAgent(StoryboardSkill(FakeLlmProvider()))
     state = VideoGenerationState(
-        file_path="x.pdf", sections=[ChapterSection(title="Localized", content="Localized content.")]
+        file_path="x.pdf", task_id="job-1", sections=[ChapterSection(title="Localized", content="Localized content.")]
     )
 
     update = await agent(state)
@@ -121,7 +129,37 @@ async def test_storyboard_agent_returns_beats() -> None:
 async def test_storyboard_agent_requires_sections() -> None:
     """The agent fails explicitly when the Teacher stage has not run yet."""
     agent = StoryboardAgent(StoryboardSkill(FakeLlmProvider()))
-    state = VideoGenerationState(file_path="x.pdf")
+    state = VideoGenerationState(file_path="x.pdf", task_id="job-1")
 
     with pytest.raises(ValueError, match="Teacher stage"):
+        await agent(state)
+
+
+async def test_narration_agent_returns_narrated_beats(tmp_path) -> None:
+    """The agent maps the Narration skill's result onto the narrated_beats state field."""
+    agent = NarrationAgent(NarrationSkill(FakeTtsTool(), tmp_path))
+    beat = ScriptBeat(narration="Plants make food.", visual_prompt="A sunlit leaf.", duration_seconds=4.0)
+    state = VideoGenerationState(file_path="x.pdf", task_id="job-1", storyboard_beats=[beat])
+
+    update = await agent(state)
+
+    assert update == {
+        "narrated_beats": [
+            NarratedBeat(
+                narration="Plants make food.",
+                visual_prompt="A sunlit leaf.",
+                duration_seconds=4.0,
+                audio_path=str(tmp_path / "job-1" / "beat_000.mp3"),
+                word_timestamps=[{"word": "Mock", "start_seconds": 0.0, "end_seconds": 0.5}],
+            )
+        ]
+    }
+
+
+async def test_narration_agent_requires_storyboard_beats(tmp_path) -> None:
+    """The agent fails explicitly when the Storyboard stage has not run yet."""
+    agent = NarrationAgent(NarrationSkill(FakeTtsTool(), tmp_path))
+    state = VideoGenerationState(file_path="x.pdf", task_id="job-1")
+
+    with pytest.raises(ValueError, match="Storyboard stage"):
         await agent(state)

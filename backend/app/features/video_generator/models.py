@@ -49,6 +49,24 @@ class ScriptBeat(BaseModel):
     duration_seconds: float = Field(gt=0)
 
 
+class WordTimestamp(BaseModel):
+    """Word-level timing captured from text-to-speech synthesis."""
+
+    word: NonBlankString
+    start_seconds: float = Field(ge=0)
+    end_seconds: float = Field(gt=0)
+
+
+class NarratedBeat(BaseModel):
+    """Storyboard beat enriched with synthesized audio and word-level timing."""
+
+    narration: NonBlankString
+    visual_prompt: NonBlankString
+    duration_seconds: float = Field(gt=0)
+    audio_path: NonBlankString
+    word_timestamps: list[WordTimestamp] = Field(default_factory=list)
+
+
 class JobStatusResponse(BaseModel):
     """Current status response for a persisted video-generation job."""
 
@@ -57,6 +75,7 @@ class JobStatusResponse(BaseModel):
     markdown_content: str | None = None
     sections: list[ChapterSection] | None = None
     storyboard_beats: list[ScriptBeat] | None = None
+    narrated_beats: list[NarratedBeat] | None = None
     error_message: str | None = None
 
 
@@ -64,8 +83,10 @@ class VideoGenerationState(BaseModel):
     """Shared immutable-by-convention state that moves through LangGraph nodes."""
 
     file_path: str
+    task_id: str
     markdown_content: str | None = None
     sections: list[ChapterSection] = Field(default_factory=list)
     storyboard_beats: list[ScriptBeat] = Field(default_factory=list)
+    narrated_beats: list[NarratedBeat] = Field(default_factory=list)
     output_video_path: str | None = None
     error_message: str | None = None

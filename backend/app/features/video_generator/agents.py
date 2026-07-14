@@ -1,9 +1,10 @@
 """LangGraph agent nodes for the video-generation pipeline."""
 
 from app.core.interfaces import IMcpTool
-from app.features.video_generator.models import ChapterSection, ScriptBeat, VideoGenerationState
+from app.features.video_generator.models import ChapterSection, NarratedBeat, ScriptBeat, VideoGenerationState
 from app.features.video_generator.skills.curriculum import CurriculumSkill
 from app.features.video_generator.skills.lesson_planning import LessonPlanningSkill
+from app.features.video_generator.skills.narration import NarrationSkill
 from app.features.video_generator.skills.storyboard import StoryboardSkill
 from app.features.video_generator.skills.teacher import TeacherSkill
 
@@ -151,3 +152,35 @@ class StoryboardAgent:
             raise ValueError("Storyboard agent requires sections from the Teacher stage.")
         storyboard_beats = await self._storyboard_skill.create_storyboard(state.sections)
         return {"storyboard_beats": storyboard_beats}
+
+
+class NarrationAgent:
+    """Audio & Sync-stage agent: synthesizes narration audio and word timing per beat."""
+
+    def __init__(self, narration_skill: NarrationSkill) -> None:
+        """Create the agent with its injected Narration skill.
+
+        Args:
+            narration_skill: Skill that drives TTS synthesis and validates timing output.
+        """
+        self._narration_skill = narration_skill
+
+    async def __call__(self, state: VideoGenerationState) -> dict[str, list[NarratedBeat]]:
+        """Populate ``narrated_beats`` from the state's Storyboard-stage output.
+
+        Args:
+            state: Current shared pipeline state.
+
+        Returns:
+            Partial state update containing the narrated, timed scene beats.
+
+        Raises:
+            ValueError: If the Storyboard stage has not yet produced storyboard beats.
+        """
+        if not state.storyboard_beats:
+            raise ValueError("Narration agent requires storyboard_beats from the Storyboard stage.")
+        narrated_beats = [
+            await self._narration_skill.narrate_beat(beat, index, state.task_id)
+            for index, beat in enumerate(state.storyboard_beats)
+        ]
+        return {"narrated_beats": narrated_beats}

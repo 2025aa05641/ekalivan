@@ -1,9 +1,11 @@
 """Video-generation graph construction and invocation tests."""
 
+from pathlib import Path
+
 from app.core.interfaces import IMcpTool
 from app.features.video_generator.graph import build_video_generation_graph
 from app.features.video_generator.models import VideoGenerationState
-from tests.conftest import FakeLlmProvider
+from tests.conftest import FakeLlmProvider, FakeTtsTool
 
 
 class _StubParserTool(IMcpTool):
@@ -13,13 +15,14 @@ class _StubParserTool(IMcpTool):
         return f"# Parsed: {kwargs['file_path']}"
 
 
-async def test_graph_invocation_runs_full_wired_chain() -> None:
-    """Invoking the compiled graph runs Parser, Pedagogy, then Storyboard agents in order."""
-    graph = build_video_generation_graph(_StubParserTool(), FakeLlmProvider())
+async def test_graph_invocation_runs_full_wired_chain(tmp_path: Path) -> None:
+    """Invoking the compiled graph runs Parser, Pedagogy, Storyboard, then Narration in order."""
+    graph = build_video_generation_graph(_StubParserTool(), FakeLlmProvider(), FakeTtsTool(), tmp_path)
 
-    raw_result = await graph.ainvoke(VideoGenerationState(file_path="chapter.pdf"))
+    raw_result = await graph.ainvoke(VideoGenerationState(file_path="chapter.pdf", task_id="job-1"))
     result = VideoGenerationState.model_validate(raw_result)
 
     assert result.markdown_content == "# Parsed: chapter.pdf"
     assert result.sections[0].title == "Mock Section"
     assert result.storyboard_beats[0].narration == "Mock narration."
+    assert result.narrated_beats[0].word_timestamps[0].word == "Mock"

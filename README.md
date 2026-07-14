@@ -22,15 +22,19 @@ This repository contains the Sprint 0 foundation for the platform defined in the
 - `frontend/`: Flutter client using feature-first Clean Architecture, Riverpod for observed async state, Dio for networking, and GoRouter named routes.
 - `mcp_demo/`: Existing exploratory notebook; it is not part of the production application.
 
-Sprint 1 persists accepted generation jobs and runs a background status lifecycle. Sprint 2 wires the Intake stage (MarkItDown) into a real LangGraph pipeline. Sprints 3–4 add the Pedagogy stages — Curriculum, Lesson Planning, and Teacher — each an LLM-backed node calling a local Ollama server through the LLM Provider Layer. Sprint 5 adds the Storyboard stage, turning localized narration into timed scene beats. The remaining pipeline stages, media tooling, and local asset cache remain scheduled for later sprints.
+Sprint 1 persists accepted generation jobs and runs a background status lifecycle. Sprint 2 wires the Intake stage (MarkItDown) into a real LangGraph pipeline. Sprints 3–4 add the Pedagogy stages — Curriculum, Lesson Planning, and Teacher — each an LLM-backed node calling a local Ollama server through the LLM Provider Layer. Sprint 5 adds the Storyboard stage, turning localized narration into timed scene beats. Sprint 6 adds the Narration stage, synthesizing per-beat audio and word-level timestamps via Edge TTS. The remaining pipeline stages, media tooling, and local asset cache remain scheduled for later sprints.
 
 ## Run the backend
 
-Python 3.12 is required. The Pedagogy and Storyboarding stages (Curriculum, Lesson Planning, Teacher, Storyboard) call a local [Ollama](https://ollama.com) server; install it and pull the configured model (`llama3.1` by default) before generating a video, or the pipeline will complete Intake and then fail explicitly at the first LLM-backed stage:
+Python 3.12 is required.
+
+The Pedagogy and Storyboarding stages (Curriculum, Lesson Planning, Teacher, Storyboard) call a local [Ollama](https://ollama.com) server; install it and pull the configured model (`llama3.1` by default) before generating a video, or the pipeline will complete Intake and then fail explicitly at the first LLM-backed stage:
 
 ```bash
 ollama pull llama3.1
 ```
+
+The Narration stage calls Microsoft's Edge TTS service over the network (no API key, but not local/offline like the other stages) to synthesize each storyboard beat's audio and capture word-level timestamps. Audio files are written under `<STATIC_ASSETS_PATH>/audio/<task_id>/`.
 
 ```bash
 cd backend
@@ -91,7 +95,7 @@ For an Android emulator, replace `localhost` with the host alias appropriate to 
 
 ## API contract
 
-`POST /api/v1/videos/generate` accepts `class_level`, `subject`, `chapter_title`, and `file_storage_path`; it returns `202 Accepted` and a UUID-backed queued task. Query `GET /api/v1/videos/{task_id}` for its current status. The job moves through `QUEUED → PROCESSING → COMPLETED` (or `FAILED`, with `error_message` set) as it runs the Intake stage (MarkItDown parses the source file to Markdown), the Pedagogy stages (Curriculum structures that Markdown into concept `sections`, Lesson Planning paces them for a Class 6 lesson, and Teacher rewrites them into localized narration), and the Storyboarding stage (turning those sections into timed `storyboard_beats`); no video is rendered yet.
+`POST /api/v1/videos/generate` accepts `class_level`, `subject`, `chapter_title`, and `file_storage_path`; it returns `202 Accepted` and a UUID-backed queued task. Query `GET /api/v1/videos/{task_id}` for its current status. The job moves through `QUEUED → PROCESSING → COMPLETED` (or `FAILED`, with `error_message` set) as it runs the Intake stage (MarkItDown parses the source file to Markdown), the Pedagogy stages (Curriculum structures that Markdown into concept `sections`, Lesson Planning paces them for a Class 6 lesson, and Teacher rewrites them into localized narration), the Storyboarding stage (turning those sections into timed `storyboard_beats`), and the Narration stage (synthesizing each beat's audio and word-level timing into `narrated_beats`); no video is rendered yet.
 
 ## Environment
 

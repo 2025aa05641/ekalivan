@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.features.video_generator.db_models import VideoJob
 from app.features.video_generator.models import (
     ChapterSection,
+    NarratedBeat,
     ScriptBeat,
     VideoGenerationRequest,
     VideoTaskStatus,
@@ -80,6 +81,7 @@ class VideoJobRepository:
         markdown_content: str,
         sections: list[ChapterSection],
         storyboard_beats: list[ScriptBeat],
+        narrated_beats: list[NarratedBeat],
     ) -> VideoJob | None:
         """Record a successful pipeline result and complete the job.
 
@@ -88,6 +90,7 @@ class VideoJobRepository:
             markdown_content: Markdown produced by the Parser agent.
             sections: Concept sections produced by the Teacher agent.
             storyboard_beats: Timed scene beats produced by the Storyboard agent.
+            narrated_beats: Narrated, timed scene beats produced by the Narration agent.
 
         Returns:
             Updated job, or ``None`` when the job does not exist.
@@ -99,6 +102,7 @@ class VideoJobRepository:
         job.markdown_content = markdown_content
         job.sections = [section.model_dump() for section in sections]
         job.storyboard_beats = [beat.model_dump() for beat in storyboard_beats]
+        job.narrated_beats = [beat.model_dump() for beat in narrated_beats]
         await self._session.commit()
         await self._session.refresh(job)
         return job

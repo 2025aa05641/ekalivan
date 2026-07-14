@@ -1,6 +1,7 @@
 """Async API endpoints for persisted video-generation jobs."""
 
 import asyncio
+import logging
 from collections.abc import Coroutine
 from uuid import UUID
 
@@ -13,6 +14,7 @@ from app.core.errors import TaskNotFoundError
 from app.features.video_generator.models import (
     ChapterSection,
     JobStatusResponse,
+    NarratedBeat,
     ScriptBeat,
     VideoGenerationRequest,
     VideoGenerationResponse,
@@ -21,6 +23,8 @@ from app.features.video_generator.models import (
 )
 from app.features.video_generator.repository import VideoJobRepository
 from app.features.video_generator.service import VideoGenerationService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/videos", tags=["video-generation"])
 
@@ -42,7 +46,7 @@ async def run_video_generation_pipeline(
     task_id: UUID,
     graph: CompiledStateGraph[VideoGenerationState],
 ) -> None:
-    """Advance a job through the Intake, Pedagogy, and Storyboarding stages of the generation graph.
+    """Advance a job through the Intake, Pedagogy, Storyboarding, and Audio & Sync stages.
 
     Args:
         session_factory: Factory that provides isolated background-task sessions.
@@ -55,15 +59,23 @@ async def run_video_generation_pipeline(
         if job is None:
             return
         try:
-            raw_result = await graph.ainvoke(VideoGenerationState(file_path=job.file_storage_path))
+            raw_result = await graph.ainvoke(VideoGenerationState(file_path=job.file_storage_path, task_id=str(job.id)))
             result = VideoGenerationState.model_validate(raw_result)
         except Exception as exc:
-            await repository.mark_failed(task_id, str(exc))
+            logger.exception("Video generation pipeline failed for job %s", task_id)
+            await repository.mark_failed(task_id, str(exc) or f"{type(exc).__name__} (see server logs for details)")
             return
-        if result.markdown_content is None or not result.sections or not result.storyboard_beats:
+        if (
+            result.markdown_content is None
+            or not result.sections
+            or not result.storyboard_beats
+            or not result.narrated_beats
+        ):
             await repository.mark_failed(task_id, "Pipeline completed without producing the expected content.")
             return
-        await repository.mark_completed(task_id, result.markdown_content, result.sections, result.storyboard_beats)
+        await repository.mark_completed(
+            task_id, result.markdown_content, result.sections, result.storyboard_beats, result.narrated_beats
+        )
 
 
 def schedule_background_task(app: Request, coroutine: Coroutine[object, object, None]) -> None:
@@ -128,11 +140,13 @@ async def get_video_job_status(
     storyboard_beats = (
         [ScriptBeat.model_validate(beat) for beat in job.storyboard_beats] if job.storyboard_beats else None
     )
+    narrated_beats = [NarratedBeat.model_validate(beat) for beat in job.narrated_beats] if job.narrated_beats else None
     return JobStatusResponse(
         task_id=job.id,
         status=VideoTaskStatus(job.status),
         markdown_content=job.markdown_content,
         sections=sections,
         storyboard_beats=storyboard_beats,
+        narrated_beats=narrated_beats,
         error_message=job.error_message,
     )

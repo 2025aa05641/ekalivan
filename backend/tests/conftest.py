@@ -9,6 +9,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.interfaces import ILlmProvider, IMcpTool, ResponseModel
+from app.features.video_generator.models import WordTimestamp
 from app.infrastructure.database import Base
 from app.main import create_app
 
@@ -60,6 +61,14 @@ class FakeLlmProvider(ILlmProvider):
         raise ValueError(f"FakeLlmProvider does not recognize response schema '{response_schema.__name__}'.")
 
 
+class FakeTtsTool(IMcpTool):
+    """Fast, deterministic Narration-stage stand-in for API-level tests."""
+
+    async def execute(self, **kwargs: object) -> object:
+        """Return deterministic word timestamps without touching the network or disk."""
+        return [WordTimestamp(word="Mock", start_seconds=0.0, end_seconds=0.5)]
+
+
 @pytest_asyncio.fixture
 async def session_factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     """Create an isolated async SQLite database for one test.
@@ -86,7 +95,12 @@ async def test_app(session_factory: async_sessionmaker[AsyncSession]) -> FastAPI
     Returns:
         FastAPI application wired to fast, deterministic Intake/Pedagogy stand-ins.
     """
-    return create_app(session_factory=session_factory, parser_tool=FakeParserTool(), llm_provider=FakeLlmProvider())
+    return create_app(
+        session_factory=session_factory,
+        parser_tool=FakeParserTool(),
+        llm_provider=FakeLlmProvider(),
+        tts_tool=FakeTtsTool(),
+    )
 
 
 @pytest_asyncio.fixture

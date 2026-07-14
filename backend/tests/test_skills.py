@@ -1,11 +1,14 @@
 """Skills layer tests."""
 
-from app.features.video_generator.models import ChapterSection, ScriptBeat
+from pathlib import Path
+
+from app.features.video_generator.models import ChapterSection, NarratedBeat, ScriptBeat
 from app.features.video_generator.skills.curriculum import CurriculumSkill
 from app.features.video_generator.skills.lesson_planning import LessonPlanningSkill
+from app.features.video_generator.skills.narration import NarrationSkill
 from app.features.video_generator.skills.storyboard import StoryboardSkill
 from app.features.video_generator.skills.teacher import TeacherSkill
-from tests.conftest import FakeLlmProvider
+from tests.conftest import FakeLlmProvider, FakeTtsTool
 
 
 async def test_structure_chapter_returns_sections_from_provider() -> None:
@@ -57,3 +60,19 @@ async def test_create_storyboard_returns_beats_from_provider() -> None:
     assert beats == [ScriptBeat(narration="Mock narration.", visual_prompt="Mock visual.", duration_seconds=5.0)]
     assert provider.last_prompt is not None
     assert "Plants make food using sunlight." in provider.last_prompt
+
+
+async def test_narrate_beat_returns_narrated_beat_from_tool(tmp_path: Path) -> None:
+    """NarrationSkill builds a per-job, per-beat output path and attaches word timing."""
+    skill = NarrationSkill(FakeTtsTool(), tmp_path)
+    beat = ScriptBeat(narration="Plants make food.", visual_prompt="A sunlit leaf.", duration_seconds=4.0)
+
+    narrated_beat = await skill.narrate_beat(beat, beat_index=2, task_id="job-42")
+
+    assert narrated_beat == NarratedBeat(
+        narration="Plants make food.",
+        visual_prompt="A sunlit leaf.",
+        duration_seconds=4.0,
+        audio_path=str(tmp_path / "job-42" / "beat_002.mp3"),
+        word_timestamps=[{"word": "Mock", "start_seconds": 0.0, "end_seconds": 0.5}],
+    )

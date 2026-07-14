@@ -35,7 +35,7 @@ async def _await_generation_and_fetch_status(client: AsyncClient, app: FastAPI, 
 
 
 async def test_generate_and_read_job_status(client: AsyncClient, test_app: FastAPI) -> None:
-    """The API creates a queued job and advances it through Intake, Pedagogy, and Storyboarding."""
+    """The API creates a queued job and advances it through the full wired pipeline."""
     response = await client.post(
         "/api/v1/videos/generate",
         json={
@@ -58,6 +58,10 @@ async def test_generate_and_read_job_status(client: AsyncClient, test_app: FastA
     assert completed_payload["storyboard_beats"] == [
         {"narration": "Mock narration.", "visual_prompt": "Mock visual.", "duration_seconds": 5.0}
     ]
+    narrated_beats = completed_payload["narrated_beats"]
+    assert isinstance(narrated_beats, list)
+    assert len(narrated_beats) == 1
+    assert narrated_beats[0]["word_timestamps"] == [{"word": "Mock", "start_seconds": 0.0, "end_seconds": 0.5}]
     assert completed_payload["error_message"] is None
 
 
@@ -79,6 +83,7 @@ async def test_generate_records_pipeline_failure(client: AsyncClient, test_app: 
     assert failed_payload["markdown_content"] is None
     assert failed_payload["sections"] is None
     assert failed_payload["storyboard_beats"] is None
+    assert failed_payload["narrated_beats"] is None
     assert "Simulated parser failure" in str(failed_payload["error_message"])
 
 
