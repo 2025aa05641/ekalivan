@@ -1,0 +1,4 @@
+1
+00:00:00,000 --> 00:00:12,770
+When a hot object touches a cold object, heat flows from the hot one to the cold one, until both reach the same temperature. This is called thermal equilibrium.
+

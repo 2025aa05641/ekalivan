@@ -1,0 +1,4 @@
+1
+00:00:00,000 --> 00:00:14,740
+Heat is a kind of energy. Every object is made of tiny particles called molecules, and they are always moving. When we heat something, its molecules vibrate and move faster.
+

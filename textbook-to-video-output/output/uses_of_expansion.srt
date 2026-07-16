@@ -1,0 +1,4 @@
+1
+00:00:00,000 --> 00:00:12,380
+Engineers use thermal expansion cleverly. They leave small gaps between railway tracks and bridge joints, so the metal doesn't crack when it expands in the heat.
+

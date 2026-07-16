@@ -1,0 +1,23 @@
+{
+  "clip_paths": {
+    "intro": "D:\\MyDOCS\\Mtech_Process\\Course\\FinalSemDissertion\\Textbook-to-Video_Output\\veo3_clips\\intro.mp4",
+    "what_is_heat": "D:\\MyDOCS\\Mtech_Process\\Course\\FinalSemDissertion\\Textbook-to-Video_Output\\veo3_clips\\what_is_heat.mp4",
+    "hot_cold_temperature": "D:\\MyDOCS\\Mtech_Process\\Course\\FinalSemDissertion\\Textbook-to-Video_Output\\veo3_clips\\hot_cold_temperature.mp4",
+    "uses_of_expansion": "D:\\MyDOCS\\Mtech_Process\\Course\\FinalSemDissertion\\Textbook-to-Video_Output\\veo3_clips\\uses_of_expansion.mp4",
+    "outro": "D:\\MyDOCS\\Mtech_Process\\Course\\FinalSemDissertion\\Textbook-to-Video_Output\\veo3_clips\\outro.mp4"
+  },
+  "budget_exhausted": true,
+  "beats_completed": [
+    "intro",
+    "what_is_heat",
+    "hot_cold_temperature",
+    "uses_of_expansion",
+    "outro"
+  ],
+  "beats_not_attempted": [
+    "heat_vs_temperature",
+    "sources",
+    "thermal_equilibrium",
+    "thermal_expansion"
+  ]
+}

@@ -1,0 +1,4 @@
+1
+00:00:00,000 --> 00:00:13,510
+Heat and temperature are not the same thing. Temperature tells us how fast the molecules are moving. Heat depends on temperature and on how many molecules there are.
+

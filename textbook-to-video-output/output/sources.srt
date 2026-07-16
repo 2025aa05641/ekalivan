@@ -1,0 +1,4 @@
+1
+00:00:00,000 --> 00:00:14,520
+Heat comes from many places. The Sun is the biggest source of heat. We also get heat by rubbing two surfaces together, called friction, and from electricity flowing through wires.
+

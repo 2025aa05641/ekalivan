@@ -1,0 +1,4 @@
+1
+00:00:00,000 --> 00:00:10,390
+Most things expand, or get bigger, when they are heated, and shrink back when they cool down. This is called thermal expansion.
+

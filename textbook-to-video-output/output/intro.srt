@@ -1,0 +1,4 @@
+1
+00:00:00,000 --> 00:00:12,860
+Hi everyone! Today we're going to learn all about heat — what it is, how it moves, and why things change size when they get hot. Let's get started!
+
