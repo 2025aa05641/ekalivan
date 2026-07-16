@@ -1,13 +1,15 @@
 """Skills layer tests."""
 
+import json
 from pathlib import Path
 
+from app.core.interfaces import IMcpTool
 from app.features.video_generator.models import ChapterSection, NarratedBeat, ScriptBeat, WordTimestamp
 from app.features.video_generator.skills.curriculum import CurriculumSkill
 from app.features.video_generator.skills.lesson_planning import LessonPlanningSkill
 from app.features.video_generator.skills.narration import NarrationSkill
 from app.features.video_generator.skills.publishing import PublishingSkill
-from app.features.video_generator.skills.rendering import RenderingSkill
+from app.features.video_generator.skills.rendering import RenderingSkill, clip_cache_key
 from app.features.video_generator.skills.storyboard import StoryboardSkill
 from app.features.video_generator.skills.teacher import TeacherSkill
 from tests.conftest import FakeCompositionTool, FakeEncodeTool, FakeLlmProvider, FakeStorageTool, FakeTtsTool
@@ -96,6 +98,87 @@ async def test_render_video_returns_final_path_from_encode_tool(tmp_path: Path) 
     output_video_path = await skill.render_video([narrated_beat], task_id="job-42")
 
     assert output_video_path == str(tmp_path / "job-42" / "final.mp4")
+
+
+async def test_render_video_writes_beats_manifest_for_clip_generation(tmp_path: Path) -> None:
+    """RenderingSkill writes a beats.json manifest with a stable, prompt-derived clip id."""
+    skill = RenderingSkill(FakeCompositionTool(), FakeEncodeTool(), tmp_path)
+    narrated_beat = NarratedBeat(
+        narration="Plants make food.", visual_prompt="A sunlit leaf.", duration_seconds=4.0, audio_path="beat.mp3"
+    )
+
+    await skill.render_video([narrated_beat], task_id="job-42")
+
+    manifest = json.loads((tmp_path / "job-42" / "beats.json").read_text(encoding="utf-8"))
+    assert manifest == [
+        {
+            "id": clip_cache_key("A sunlit leaf."),
+            "prompt": "A sunlit leaf.",
+            "narration": "Plants make food.",
+            "duration_seconds": 4.0,
+            "frames": 61,
+        }
+    ]
+
+
+async def test_render_video_passes_empty_clip_paths_when_no_veo_tool_configured(tmp_path: Path) -> None:
+    """RenderingSkill still calls the composition tool with an (empty) 'clip_paths' when Veo is unset."""
+
+    class _RecordingCompositionTool(IMcpTool):
+        def __init__(self) -> None:
+            self.last_kwargs: dict[str, object] = {}
+
+        async def execute(self, **kwargs: object) -> object:
+            self.last_kwargs = kwargs
+            return kwargs["output_path"]
+
+    composition_tool = _RecordingCompositionTool()
+    skill = RenderingSkill(composition_tool, FakeEncodeTool(), tmp_path)
+    narrated_beat = NarratedBeat(
+        narration="Plants make food.", visual_prompt="A sunlit leaf.", duration_seconds=4.0, audio_path="beat.mp3"
+    )
+
+    await skill.render_video([narrated_beat], task_id="job-42")
+
+    assert composition_tool.last_kwargs["clip_paths"] == {}
+
+
+async def test_render_video_forwards_veo_clip_paths_to_composition_tool(tmp_path: Path) -> None:
+    """RenderingSkill runs the Veo tool first and passes its clip paths on to composition."""
+
+    class _FakeVeoTool(IMcpTool):
+        def __init__(self) -> None:
+            self.last_kwargs: dict[str, object] = {}
+
+        async def execute(self, **kwargs: object) -> object:
+            self.last_kwargs = kwargs
+            beats = kwargs["beats"]
+            assert isinstance(beats, list)
+            return {beat["id"]: f"/cache/{beat['id']}.mp4" for beat in beats}
+
+    class _RecordingCompositionTool(IMcpTool):
+        def __init__(self) -> None:
+            self.last_kwargs: dict[str, object] = {}
+
+        async def execute(self, **kwargs: object) -> object:
+            self.last_kwargs = kwargs
+            return kwargs["output_path"]
+
+    veo_tool = _FakeVeoTool()
+    composition_tool = _RecordingCompositionTool()
+    skill = RenderingSkill(composition_tool, FakeEncodeTool(), tmp_path, veo_tool)
+    narrated_beat = NarratedBeat(
+        narration="Plants make food.", visual_prompt="A sunlit leaf.", duration_seconds=4.0, audio_path="beat.mp3"
+    )
+
+    await skill.render_video([narrated_beat], task_id="job-42")
+
+    beat_id = clip_cache_key("A sunlit leaf.")
+    assert veo_tool.last_kwargs["beats"] == [
+        {"id": beat_id, "visual_prompt": "A sunlit leaf.", "duration_seconds": 4.0}
+    ]
+    assert veo_tool.last_kwargs["cache_dir"] == str(tmp_path / "job-42" / "veo_clips")
+    assert composition_tool.last_kwargs["clip_paths"] == {beat_id: f"/cache/{beat_id}.mp4"}
 
 
 async def test_publish_returns_video_url_relative_to_static_assets_dir(tmp_path: Path) -> None:

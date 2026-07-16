@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     ollama_fallback_model: str | None = None
     ollama_timeout_seconds: float = Field(default=120.0, gt=0)
     max_concurrent_render_jobs: int = Field(default=2, ge=1)
+    google_api_key: str | None = None
+    veo_model: str = "veo-3.1-fast-generate-preview"
 
     @property
     def cors_origins(self) -> list[str]:

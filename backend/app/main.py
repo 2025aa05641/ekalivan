@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from google import genai
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.core.config import get_settings
@@ -18,7 +19,13 @@ from app.core.errors import register_exception_handlers
 from app.core.interfaces import ILlmProvider, IMcpTool
 from app.core.logging import configure_logging
 from app.features.video_generator.graph import build_video_generation_graph
-from app.features.video_generator.mcp_tools import EdgeTtsTool, FFmpegTool, MarkItDownTool, MoviePyTool
+from app.features.video_generator.mcp_tools import (
+    EdgeTtsTool,
+    FFmpegTool,
+    MarkItDownTool,
+    MoviePyTool,
+    VeoVideoGenerationTool,
+)
 from app.features.video_generator.router import router as video_generator_router
 from app.infrastructure.database import create_engine, create_session_factory
 from app.infrastructure.fallback_llm_provider import FallbackLlmProvider
@@ -59,6 +66,7 @@ def create_app(
     composition_tool: IMcpTool | None = None,
     encode_tool: IMcpTool | None = None,
     storage_tool: IMcpTool | None = None,
+    veo_tool: IMcpTool | None = None,
     max_concurrent_render_jobs: int | None = None,
 ) -> FastAPI:
     """Build the configured API application for production or test use.
@@ -72,6 +80,10 @@ def create_app(
         composition_tool: Assembly-stage composition MCP tool to use in place of ``MoviePyTool``.
         encode_tool: Assembly-stage encode MCP tool to use in place of ``FFmpegTool``.
         storage_tool: Publishing-stage MCP tool to use in place of ``StorageTool``.
+        veo_tool: Assembly-stage MCP tool that generates real video clips per beat (Veo).
+            Unlike the other tools, this has no settings-based default here — a caller must
+            opt in explicitly, since constructing it wires a billed external API. Production
+            wiring lives at this module's bottom, gated on ``settings.google_api_key``.
         max_concurrent_render_jobs: Render-slot cap to use in place of ``settings.max_concurrent_render_jobs``.
 
     Returns:
@@ -109,6 +121,7 @@ def create_app(
         static_assets_dir / "video",
         storage_tool or StorageTool(),
         static_assets_dir,
+        veo_tool,
     )
     app.state.render_semaphore = asyncio.Semaphore(max_concurrent_render_jobs or settings.max_concurrent_render_jobs)
     app.state.background_tasks = set()
@@ -133,4 +146,17 @@ def create_app(
     return app
 
 
-app = create_app()
+def _build_default_veo_tool() -> IMcpTool | None:
+    """Construct the production Veo tool from settings, or ``None`` if unconfigured.
+
+    Returns:
+        A ``VeoVideoGenerationTool`` wired to the configured API key, or ``None`` when
+        ``GOOGLE_API_KEY`` isn't set — rendering then falls back to local icon animation.
+    """
+    settings = get_settings()
+    if not settings.google_api_key:
+        return None
+    return VeoVideoGenerationTool(genai.Client(api_key=settings.google_api_key), settings.veo_model)
+
+
+app = create_app(veo_tool=_build_default_veo_tool())

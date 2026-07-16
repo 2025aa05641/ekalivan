@@ -1,12 +1,22 @@
 """MCP tool adapter tests."""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pytest
+from google.genai import errors as genai_errors
 
-from app.features.video_generator.mcp_tools import EdgeTtsTool, FFmpegTool, MarkItDownTool, MoviePyTool
+from app.features.video_generator.mcp_tools import (
+    EdgeTtsTool,
+    FFmpegTool,
+    MarkItDownTool,
+    MoviePyTool,
+    VeoVideoGenerationTool,
+)
 from app.features.video_generator.models import WordTimestamp
+from app.features.video_generator.skills.rendering import clip_cache_key
 
 FIXTURE_PATH = str(Path(__file__).parent / "fixtures" / "sample_chapter.txt")
 SILENT_AUDIO_FIXTURE_PATH = str(Path(__file__).parent / "fixtures" / "silent_beat.wav")
@@ -122,6 +132,185 @@ async def test_moviepy_execute_requires_beats_and_output_path() -> None:
 
     with pytest.raises(TypeError):
         await tool.execute(beats=[], output_path="unused.mp4")
+
+
+async def test_moviepy_execute_rejects_non_dict_clip_paths() -> None:
+    """The tool rejects a 'clip_paths' argument that isn't a dict."""
+    tool = MoviePyTool()
+
+    with pytest.raises(TypeError):
+        await tool.execute(beats=_TEST_BEATS, output_path="unused.mp4", clip_paths=["not", "a", "dict"])
+
+
+async def test_moviepy_execute_uses_a_provided_clip_as_the_background(tmp_path: Path) -> None:
+    """A beat whose visual_prompt key is in 'clip_paths' uses that real clip, not the drawn icon."""
+    tool = MoviePyTool(video_size=(320, 240), fps=10)
+    # Any real, playable video works as the "Veo clip" stand-in — reuse the icon-drawn
+    # path to produce one without needing a checked-in binary fixture.
+    source_clip_path = tmp_path / "source_clip.mp4"
+    await tool.execute(beats=_TEST_BEATS[:1], output_path=str(source_clip_path))
+
+    output_path = tmp_path / "composed.mp4"
+    clip_paths = {clip_cache_key(_TEST_BEATS[0]["visual_prompt"]): str(source_clip_path)}
+
+    result = await tool.execute(beats=_TEST_BEATS, output_path=str(output_path), clip_paths=clip_paths)
+
+    assert result == str(output_path)
+    assert output_path.exists()
+    assert output_path.stat().st_size > 0
+
+
+@dataclass
+class _FakeVideo:
+    """Stand-in for ``genai.types.Video`` distinguishable across extension calls."""
+
+    marker: str
+
+
+@dataclass
+class _GeneratedVideo:
+    video: _FakeVideo
+
+
+@dataclass
+class _Response:
+    generated_videos: list[_GeneratedVideo]
+
+
+class _FakeOperation:
+    """Stand-in for a completed ``genai.types.GenerateVideosOperation``."""
+
+    def __init__(self, video: _FakeVideo | None, *, error: str | None = None) -> None:
+        self.done = True
+        self.error = error
+        self.response = _Response([_GeneratedVideo(video)]) if video is not None else None
+
+
+class _FakeModels:
+    """Records every ``generate_videos`` call and replays scripted responses/errors."""
+
+    def __init__(self, on_generate: Callable[..., _FakeOperation]) -> None:
+        self.calls: list[dict[str, Any]] = []
+        self._on_generate = on_generate
+
+    def generate_videos(
+        self, *, model: str, prompt: str, video: _FakeVideo | None = None, config: object = None
+    ) -> _FakeOperation:
+        self.calls.append({"model": model, "prompt": prompt, "video": video, "config": config})
+        return self._on_generate(video=video, call_index=len(self.calls) - 1)
+
+
+class _FakeOperations:
+    """Operations are always pre-completed by ``_FakeModels``, so ``get`` is never exercised."""
+
+    def get(self, operation: _FakeOperation) -> _FakeOperation:
+        return operation
+
+
+class _FakeFiles:
+    def __init__(self, bytes_by_marker: dict[str, bytes]) -> None:
+        self._bytes_by_marker = bytes_by_marker
+
+    def download(self, *, file: _FakeVideo) -> bytes:
+        return self._bytes_by_marker[file.marker]
+
+
+class _FakeGenaiClient:
+    def __init__(self, models: _FakeModels, files: _FakeFiles) -> None:
+        self.models = models
+        self.operations = _FakeOperations()
+        self.files = files
+
+
+async def test_veo_execute_extends_a_clip_to_cover_the_beats_duration(tmp_path: Path) -> None:
+    """A beat longer than 8s gets one extension call, and the final clip is downloaded."""
+    initial_video = _FakeVideo("initial")
+    extended_video = _FakeVideo("extended")
+
+    def on_generate(*, video: _FakeVideo | None, call_index: int) -> _FakeOperation:
+        return _FakeOperation(initial_video if video is None else extended_video)
+
+    models = _FakeModels(on_generate)
+    files = _FakeFiles({"initial": b"initial-bytes", "extended": b"extended-bytes"})
+    tool = VeoVideoGenerationTool(_FakeGenaiClient(models, files), "veo-3.1-fast-generate-preview")
+    beats = [{"id": "beat-1", "visual_prompt": "a sunlit leaf", "duration_seconds": 13.0}]
+
+    clip_paths = await tool.execute(beats=beats, cache_dir=str(tmp_path))
+
+    assert clip_paths == {"beat-1": str(tmp_path / "beat-1.mp4")}
+    assert (tmp_path / "beat-1.mp4").read_bytes() == b"extended-bytes"
+    assert len(models.calls) == 2
+    assert models.calls[0]["video"] is None
+    assert models.calls[0]["config"].duration_seconds == 8
+    assert models.calls[1]["video"] is initial_video
+    assert tool.budget_exhausted is False
+
+
+async def test_veo_execute_does_not_extend_a_clip_within_8_seconds(tmp_path: Path) -> None:
+    """A beat under 8s stops after the initial call — no extension is requested."""
+    result_video = _FakeVideo("only")
+    models = _FakeModels(lambda *, video, call_index: _FakeOperation(result_video))
+    files = _FakeFiles({"only": b"only-bytes"})
+    tool = VeoVideoGenerationTool(_FakeGenaiClient(models, files), "veo-3.1-fast-generate-preview")
+    beats = [{"id": "beat-1", "visual_prompt": "a sunlit leaf", "duration_seconds": 5.0}]
+
+    clip_paths = await tool.execute(beats=beats, cache_dir=str(tmp_path))
+
+    assert clip_paths == {"beat-1": str(tmp_path / "beat-1.mp4")}
+    assert len(models.calls) == 1
+
+
+async def test_veo_execute_stops_remaining_beats_after_a_billing_error(tmp_path: Path) -> None:
+    """Once billing/quota is exhausted, later beats are skipped instead of attempted."""
+
+    def on_generate(*, video: _FakeVideo | None, call_index: int) -> _FakeOperation:
+        raise genai_errors.ClientError(code=429, response_json={"message": "quota exceeded"})
+
+    models = _FakeModels(on_generate)
+    tool = VeoVideoGenerationTool(_FakeGenaiClient(models, _FakeFiles({})), "veo-3.1-fast-generate-preview")
+    beats = [
+        {"id": "beat-1", "visual_prompt": "a sunlit leaf", "duration_seconds": 5.0},
+        {"id": "beat-2", "visual_prompt": "a growing plant", "duration_seconds": 5.0},
+    ]
+
+    clip_paths = await tool.execute(beats=beats, cache_dir=str(tmp_path))
+
+    assert clip_paths == {}
+    assert tool.budget_exhausted is True
+    assert len(models.calls) == 1  # beat-2 was never attempted
+
+
+async def test_veo_execute_falls_back_to_later_beats_on_a_non_billing_error(tmp_path: Path) -> None:
+    """A beat that fails for a reason other than billing/quota is skipped, not fatal."""
+    good_video = _FakeVideo("good")
+
+    def on_generate(*, video: _FakeVideo | None, call_index: int) -> _FakeOperation:
+        if len(models.calls) == 1:
+            raise RuntimeError("safety-filtered")
+        return _FakeOperation(good_video)
+
+    models = _FakeModels(on_generate)
+    files = _FakeFiles({"good": b"good-bytes"})
+    tool = VeoVideoGenerationTool(_FakeGenaiClient(models, files), "veo-3.1-fast-generate-preview")
+    beats = [
+        {"id": "beat-1", "visual_prompt": "a sunlit leaf", "duration_seconds": 5.0},
+        {"id": "beat-2", "visual_prompt": "a growing plant", "duration_seconds": 5.0},
+    ]
+
+    clip_paths = await tool.execute(beats=beats, cache_dir=str(tmp_path))
+
+    assert clip_paths == {"beat-2": str(tmp_path / "beat-2.mp4")}
+    assert tool.budget_exhausted is False
+
+
+async def test_veo_execute_requires_beats_list_and_cache_dir() -> None:
+    """The tool rejects a missing/wrong-typed 'beats' or 'cache_dir' argument."""
+    unused_operation = _FakeOperation(_FakeVideo("unused"))
+    client = _FakeGenaiClient(_FakeModels(lambda **_: unused_operation), _FakeFiles({}))
+    tool = VeoVideoGenerationTool(client, "veo-3.1-fast-generate-preview")
+
+    with pytest.raises(TypeError):
+        await tool.execute(beats="not-a-list", cache_dir="unused")
 
 
 async def test_ffmpeg_execute_produces_a_faststart_video(tmp_path: Path) -> None:
