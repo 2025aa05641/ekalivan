@@ -260,6 +260,31 @@ async def test_veo_execute_does_not_extend_a_clip_within_8_seconds(tmp_path: Pat
     assert len(models.calls) == 1
 
 
+async def test_veo_execute_salvages_the_initial_clip_when_extension_hits_a_billing_error(tmp_path: Path) -> None:
+    """A beat whose extension fails on billing still uses its already-paid-for initial clip."""
+    initial_video = _FakeVideo("initial")
+
+    def on_generate(*, video: _FakeVideo | None, call_index: int) -> _FakeOperation:
+        if video is None:
+            return _FakeOperation(initial_video)
+        raise genai_errors.ClientError(code=429, response_json={"message": "quota exceeded"})
+
+    models = _FakeModels(on_generate)
+    files = _FakeFiles({"initial": b"initial-bytes"})
+    tool = VeoVideoGenerationTool(_FakeGenaiClient(models, files), "veo-3.1-fast-generate-preview")
+    beats = [
+        {"id": "beat-1", "visual_prompt": "a sunlit leaf", "duration_seconds": 13.0},
+        {"id": "beat-2", "visual_prompt": "a growing plant", "duration_seconds": 5.0},
+    ]
+
+    clip_paths = await tool.execute(beats=beats, cache_dir=str(tmp_path))
+
+    assert clip_paths == {"beat-1": str(tmp_path / "beat-1.mp4")}
+    assert (tmp_path / "beat-1.mp4").read_bytes() == b"initial-bytes"
+    assert tool.budget_exhausted is True
+    assert len(models.calls) == 2  # beat-1's initial + failed extension; beat-2 never attempted
+
+
 async def test_veo_execute_stops_remaining_beats_after_a_billing_error(tmp_path: Path) -> None:
     """Once billing/quota is exhausted, later beats are skipped instead of attempted."""
 

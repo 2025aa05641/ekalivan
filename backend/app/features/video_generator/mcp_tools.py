@@ -288,50 +288,70 @@ class VeoVideoGenerationTool(IMcpTool):
                 logger.info("Skipping Veo generation for beat %s: budget already exhausted.", beat_id)
                 continue
             try:
-                clip_paths[beat_id] = await self._generate_one(beat, cache_dir)
-            except VeoBudgetExhaustedError:
-                self.budget_exhausted = True
-                logger.warning("Veo generation stopped at beat %s: account can't be billed for more.", beat_id)
+                clip_path = await self._generate_one(beat, cache_dir)
             except Exception:
                 logger.warning(
                     "Veo generation failed for beat %s; it will use the local fallback.", beat_id, exc_info=True
                 )
+                continue
+            if clip_path is not None:
+                clip_paths[beat_id] = clip_path
         return clip_paths
 
-    async def _generate_one(self, beat: Mapping[str, object], cache_dir: str) -> str:
+    async def _generate_one(self, beat: Mapping[str, object], cache_dir: str) -> str | None:
         """Generate (and extend, if needed) one beat's clip and download it to disk.
+
+        If billing/quota runs out partway through extending a beat, the already-paid-for
+        clip generated so far is still downloaded and used (trimmed short) rather than
+        discarded — only a beat whose very first call fails returns nothing.
 
         Args:
             beat: Mapping with ``id``, ``visual_prompt``, and ``duration_seconds``.
             cache_dir: Directory to write the downloaded clip into.
 
         Returns:
-            The local path of the downloaded clip.
+            The local path of the downloaded clip, or ``None`` if nothing was generated
+            (also sets ``self.budget_exhausted`` when the cause was billing/quota).
         """
         beat_id = str(beat["id"])
         prompt = str(beat["visual_prompt"])
         target_seconds = float(cast(float, beat["duration_seconds"]))
 
-        operation = await self._call_generate(
-            prompt=prompt,
-            config=genai_types.GenerateVideosConfig(
-                duration_seconds=_VEO_INITIAL_DURATION_SECONDS,
-                aspect_ratio="16:9",
-                resolution="720p",
-                negative_prompt="blurry, low quality, distorted, watermark, text captions, subtitles",
-            ),
-        )
-        operation = await self._await_operation(operation)
+        try:
+            operation = await self._call_generate(
+                prompt=prompt,
+                config=genai_types.GenerateVideosConfig(
+                    duration_seconds=_VEO_INITIAL_DURATION_SECONDS,
+                    aspect_ratio="16:9",
+                    resolution="720p",
+                    negative_prompt="blurry, low quality, distorted, watermark, text captions, subtitles",
+                ),
+            )
+            operation = await self._await_operation(operation)
+        except VeoBudgetExhaustedError:
+            self.budget_exhausted = True
+            logger.warning("Veo generation stopped at beat %s: account can't be billed for more.", beat_id)
+            return None
         video = self._first_video(operation, beat_id)
         covered_seconds = float(_VEO_INITIAL_DURATION_SECONDS)
 
         while covered_seconds < target_seconds:
-            operation = await self._call_generate(
-                prompt=prompt,
-                video=video,
-                config=genai_types.GenerateVideosConfig(resolution="720p"),
-            )
-            operation = await self._await_operation(operation)
+            try:
+                operation = await self._call_generate(
+                    prompt=prompt,
+                    video=video,
+                    config=genai_types.GenerateVideosConfig(resolution="720p"),
+                )
+                operation = await self._await_operation(operation)
+            except VeoBudgetExhaustedError:
+                self.budget_exhausted = True
+                logger.warning(
+                    "Veo extension stopped at beat %s: account can't be billed for more (keeping the %.0fs "
+                    "clip generated so far).",
+                    beat_id,
+                    covered_seconds,
+                )
+                break
             video = self._first_video(operation, beat_id)
             covered_seconds += _VEO_EXTENSION_SECONDS
 
