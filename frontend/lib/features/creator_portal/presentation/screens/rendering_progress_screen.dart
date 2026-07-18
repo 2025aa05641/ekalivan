@@ -41,14 +41,25 @@ class RenderingProgressScreen extends ConsumerWidget {
         });
       });
     });
-    final AsyncValue<VideoStatusUpdateEntity> progress = ref.watch(videoProgressProvider(taskId));
+    final AsyncValue<VideoStatusUpdateEntity> progress =
+        ref.watch(videoProgressProvider(taskId));
     return AppScaffold(
       appBar: AppBar(
         leading: BackButton(
-          onPressed: () =>
-              context.goNamed(AppRoute.adminPipeline.routeName, pathParameters: <String, String>{'taskId': taskId}),
+          onPressed: () => context.goNamed(
+            AppRoute.adminPipeline.routeName,
+            pathParameters: <String, String>{'taskId': taskId},
+          ),
         ),
         title: const Text('Pipeline - Step 7'),
+        actions: <Widget>[
+          IconButton(
+            icon: const Icon(Icons.home_rounded),
+            tooltip: 'Admin Home',
+            onPressed: () =>
+                context.goNamed(AppRoute.adminDashboard.routeName),
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(24),
           child: Container(
@@ -63,7 +74,8 @@ class RenderingProgressScreen extends ConsumerWidget {
         ),
       ),
       body: progress.when(
-        data: (VideoStatusUpdateEntity update) => _RenderingBody(taskId: taskId, update: update),
+        data: (VideoStatusUpdateEntity update) =>
+            _RenderingBody(taskId: taskId, update: update),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (Object error, StackTrace stackTrace) => Padding(
           padding: const EdgeInsets.all(AppSpacing.md),
@@ -101,7 +113,12 @@ class _RenderingBody extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.card,
             borderRadius: BorderRadius.circular(16),
-            boxShadow: const [BoxShadow(color: Color(0x0F000000), blurRadius: 8, offset: Offset(0, 2))],
+            boxShadow: const [
+              BoxShadow(
+                  color: Color(0x0F000000),
+                  blurRadius: 8,
+                  offset: Offset(0, 2))
+            ],
           ),
           child: Column(
             children: <Widget>[
@@ -113,12 +130,16 @@ class _RenderingBody extends StatelessWidget {
                   color: AppColors.primaryBlue.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.movie_creation_rounded, size: 36, color: AppColors.primaryBlue),
+                child: const Icon(Icons.movie_creation_rounded,
+                    size: 36, color: AppColors.primaryBlue),
               ),
               const SizedBox(height: 16),
               Text(
                 'Rendering Video',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 6),
               Text(
@@ -181,16 +202,22 @@ class _RenderingBody extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: isFailed ? Colors.red.withValues(alpha: 0.06) : AppColors.primaryBlue.withValues(alpha: 0.06),
+            color: isFailed
+                ? Colors.red.withValues(alpha: 0.06)
+                : AppColors.primaryBlue.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isFailed ? Colors.red.withValues(alpha: 0.2) : AppColors.primaryBlue.withValues(alpha: 0.2),
+              color: isFailed
+                  ? Colors.red.withValues(alpha: 0.2)
+                  : AppColors.primaryBlue.withValues(alpha: 0.2),
             ),
           ),
           child: Row(
             children: [
               Icon(
-                isFailed ? Icons.error_outline_rounded : Icons.notifications_active_outlined,
+                isFailed
+                    ? Icons.error_outline_rounded
+                    : Icons.notifications_active_outlined,
                 color: isFailed ? Colors.red : AppColors.primaryBlue,
                 size: 18,
               ),
@@ -198,9 +225,12 @@ class _RenderingBody extends StatelessWidget {
               Expanded(
                 child: Text(
                   isFailed
-                      ? (update.errorMessage ?? 'Video rendering failed unexpectedly.')
+                      ? (update.errorMessage ??
+                          'Video rendering failed unexpectedly.')
                       : 'You will be notified once the video is ready.',
-                  style: TextStyle(color: isFailed ? Colors.red : AppColors.primaryBlue, fontSize: 13),
+                  style: TextStyle(
+                      color: isFailed ? Colors.red : AppColors.primaryBlue,
+                      fontSize: 13),
                 ),
               ),
             ],
@@ -210,7 +240,9 @@ class _RenderingBody extends StatelessWidget {
         PrimaryButton(
           label: update.status == 'COMPLETED' ? 'View Result' : 'Check Again',
           onPressed: () => context.goNamed(
-            update.status == 'COMPLETED' ? AppRoute.adminComplete.routeName : AppRoute.adminPipeline.routeName,
+            update.status == 'COMPLETED'
+                ? AppRoute.adminComplete.routeName
+                : AppRoute.adminPipeline.routeName,
             pathParameters: <String, String>{'taskId': taskId},
           ),
         ),
@@ -231,7 +263,8 @@ class _StatRow extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: <Widget>[
         Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+        Text(value,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
       ],
     );
   }

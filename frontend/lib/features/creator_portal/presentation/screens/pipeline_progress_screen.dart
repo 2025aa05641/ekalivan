@@ -116,6 +116,13 @@ class _PipelineProgressScreenState extends ConsumerState<PipelineProgressScreen>
       appBar: AppBar(
         leading: BackButton(onPressed: () => context.goNamed(AppRoute.adminDashboard.routeName)),
         title: Text(title),
+        actions: <Widget>[
+          IconButton(
+            icon: const Icon(Icons.home_rounded),
+            tooltip: 'Admin Home',
+            onPressed: () => context.goNamed(AppRoute.adminDashboard.routeName),
+          ),
+        ],
       ),
       body: progress.when(
         data: (VideoStatusUpdateEntity update) => _PipelineStepList(

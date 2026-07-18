@@ -24,6 +24,13 @@ class ClassSelectionScreen extends StatelessWidget {
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
         title: Text(medium == 'tamil' ? 'தமிழ் வழி' : 'English Medium'),
+        actions: <Widget>[
+          IconButton(
+            icon: const Icon(Icons.home_rounded),
+            tooltip: 'Student Home',
+            onPressed: () => context.goNamed(AppRoute.studentSplash.routeName),
+          ),
+        ],
       ),
       bottomNavigationBar: const StudentBottomNav(current: StudentNavDestination.home),
       body: Padding(

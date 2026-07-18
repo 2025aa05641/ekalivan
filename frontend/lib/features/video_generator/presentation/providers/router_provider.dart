@@ -26,6 +26,7 @@ import '../../domain/entities/video_job_entity.dart';
 import '../../../student_portal/presentation/screens/student_login_screen.dart';
 import '../../../student_portal/presentation/screens/student_downloads_screen.dart';
 import '../../../student_portal/presentation/screens/student_profile_screen.dart';
+import '../../../student_portal/presentation/screens/student_video_player_screen.dart';
 import '../screens/cached_video_screen.dart';
 import '../screens/generation_screen.dart';
 import '../screens/home_screen.dart';
@@ -103,7 +104,10 @@ enum AppRoute {
   studentDownloads('/student/downloads', 'student-downloads'),
 
   /// Student portal profile.
-  studentProfile('/student/profile', 'student-profile');
+  studentProfile('/student/profile', 'student-profile'),
+
+  /// Student portal lesson video player.
+  studentVideoPlayer('/student/video/:taskId', 'student-video-player');
 
   /// Creates a named application route.
   const AppRoute(this.path, this.routeName);
@@ -259,7 +263,14 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>(
       GoRoute(
         path: AppRoute.studentProfile.path,
         name: AppRoute.studentProfile.routeName,
-        builder: (BuildContext context, GoRouterState state) => const StudentProfileScreen(),
+        builder: (BuildContext context, GoRouterState state) =>
+            const StudentProfileScreen(),
+      ),
+      GoRoute(
+        path: AppRoute.studentVideoPlayer.path,
+        name: AppRoute.studentVideoPlayer.routeName,
+        builder: (BuildContext context, GoRouterState state) =>
+            StudentVideoPlayerScreen(taskId: state.pathParameters['taskId']!),
       ),
     ],
   ),

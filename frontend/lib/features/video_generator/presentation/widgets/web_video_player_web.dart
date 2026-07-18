@@ -34,21 +34,25 @@ class _WebVideoPlayerState extends State<WebVideoPlayer> {
     _videoViewCounter += 1;
     _viewId = 'ekalivan_video_${_videoViewCounter}_${widget.videoUrl.hashCode.abs()}';
 
-    ui_web.platformViewRegistry.registerViewFactory(
-      _viewId,
-      (int viewId) {
-        final web.HTMLVideoElement video =
-            web.document.createElement('video') as web.HTMLVideoElement;
-        video.src = widget.videoUrl;
-        video.controls = true;
-        video.autoplay = false;
-        video.style.width = '100%';
-        video.style.height = '100%';
-        video.style.objectFit = 'contain';
-        video.style.backgroundColor = '#000000';
-        return video;
-      },
-    );
+    try {
+      ui_web.platformViewRegistry.registerViewFactory(
+        _viewId,
+        (int viewId) {
+          final web.HTMLVideoElement video =
+              web.document.createElement('video') as web.HTMLVideoElement;
+          video.src = widget.videoUrl;
+          video.controls = true;
+          video.autoplay = false;
+          video.style.width = '100%';
+          video.style.height = '100%';
+          video.style.objectFit = 'contain';
+          video.style.backgroundColor = '#000000';
+          return video;
+        },
+      );
+    } catch (_) {
+      // Factory may already be registered from a prior build — safe to ignore.
+    }
   }
 
   @override

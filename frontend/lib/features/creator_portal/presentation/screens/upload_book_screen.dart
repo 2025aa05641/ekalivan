@@ -111,6 +111,13 @@ class _UploadBookScreenState extends ConsumerState<UploadBookScreen> {
           },
         ),
         title: const Text('Upload New Book'),
+        actions: <Widget>[
+          IconButton(
+            icon: const Icon(Icons.home_rounded),
+            tooltip: 'Admin Home',
+            onPressed: () => context.goNamed(AppRoute.adminDashboard.routeName),
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),

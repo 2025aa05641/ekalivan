@@ -19,6 +19,15 @@ import '../../../video_generator/presentation/providers/video_generation_provide
 import '../../../video_generator/presentation/widgets/video_player_view.dart';
 import '../../../video_generator/presentation/widgets/web_video_player.dart';
 
+/// Family provider: polls job status exactly once (no continuous stream) so
+/// the completed-video screen renders the result immediately without re-looping.
+final AutoDisposeFutureProviderFamily<VideoStatusUpdateEntity, String>
+    _jobStatusOnceProvider =
+    FutureProvider.autoDispose.family<VideoStatusUpdateEntity, String>(
+  (Ref ref, String taskId) =>
+      ref.watch(videoRepositoryProvider).watchGenerationProgress(taskId: taskId).first,
+);
+
 /// Celebrates a finished render and offers to preview or publish it.
 class PipelineCompleteScreen extends ConsumerWidget {
   /// Creates the pipeline-completed screen for [taskId].
@@ -29,19 +38,41 @@ class PipelineCompleteScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<VideoStatusUpdateEntity> progress = ref.watch(videoProgressProvider(taskId));
+    final AsyncValue<VideoStatusUpdateEntity> statusAsync =
+        ref.watch(_jobStatusOnceProvider(taskId));
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        leading: BackButton(onPressed: () => context.goNamed(AppRoute.adminDashboard.routeName)),
+        leading: BackButton(
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.goNamed(AppRoute.adminDashboard.routeName);
+            }
+          },
+        ),
         title: const Text('Pipeline Completed!'),
+        actions: <Widget>[
+          IconButton(
+            icon: const Icon(Icons.home_rounded),
+            tooltip: 'Admin Home',
+            onPressed: () => context.goNamed(AppRoute.adminDashboard.routeName),
+          ),
+        ],
       ),
       body: SafeArea(
-        child: progress.when(
-          data: (VideoStatusUpdateEntity update) => _CompleteBody(taskId: taskId, update: update),
+        child: statusAsync.when(
+          data: (VideoStatusUpdateEntity update) =>
+              _CompleteBody(taskId: taskId, update: update),
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (Object error, StackTrace stackTrace) =>
-              Padding(padding: const EdgeInsets.all(AppSpacing.md), child: AccessibleErrorWidget(message: error.toString())),
+          error: (Object error, StackTrace stackTrace) => Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: AccessibleErrorWidget(
+              message: error.toString(),
+              onRetry: () => ref.invalidate(_jobStatusOnceProvider(taskId)),
+            ),
+          ),
         ),
       ),
     );
@@ -89,16 +120,41 @@ class _CompleteBodyState extends ConsumerState<_CompleteBody> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.update.status != 'COMPLETED' || widget.update.videoUrl == null) {
-      return const Padding(
-        padding: EdgeInsets.all(AppSpacing.md),
-        child: AccessibleErrorWidget(message: 'This video has not finished rendering yet.'),
+    // If pipeline hasn't completed yet, poll again after 3s and show spinner.
+    if (widget.update.status != 'COMPLETED') {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(
+                'Pipeline is still running (${widget.update.status})…',
+                style: const TextStyle(color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
       );
     }
-    final String rawUrl = widget.update.videoUrl!;
+
+    // Build the absolute video URL.
+    final String? rawUrl = widget.update.videoUrl;
+    if (rawUrl == null) {
+      return const Padding(
+        padding: EdgeInsets.all(AppSpacing.md),
+        child: AccessibleErrorWidget(
+          message: 'Video URL is not yet available. The pipeline may still be publishing.',
+        ),
+      );
+    }
+
     final String videoUrl = rawUrl.startsWith('http')
         ? rawUrl
-        : '${ref.watch(apiClientProvider).baseUrl}$rawUrl';
+        : '${ref.read(apiClientProvider).baseUrl}$rawUrl';
 
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -136,18 +192,14 @@ class _CompleteBodyState extends ConsumerState<_CompleteBody> {
           ),
           child: Column(
             children: <Widget>[
-              _DetailRow(label: 'Book', value: 'Science Std 6'),
+              _DetailRow(label: 'Task ID', value: widget.taskId),
               const Divider(height: 1, indent: 16, endIndent: 16, color: AppColors.border),
-              _DetailRow(label: 'Chapter', value: 'The World of Plants'),
-              const Divider(height: 1, indent: 16, endIndent: 16, color: AppColors.border),
-              _DetailRow(label: 'Topics', value: '18'),
-              const Divider(height: 1, indent: 16, endIndent: 16, color: AppColors.border),
-              _DetailRow(label: 'Duration', value: '08:42'),
+              _DetailRow(label: 'Status', value: 'COMPLETED ✓'),
             ],
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
-        // Video player — use native HTML <video> on web to avoid CORS/codec issues
+        // Video player
         ClipRRect(
           borderRadius: BorderRadius.circular(14),
           child: AspectRatio(
@@ -158,26 +210,23 @@ class _CompleteBodyState extends ConsumerState<_CompleteBody> {
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
-        // Direct link for convenience on web
+        // Video URL hint on web
         if (kIsWeb)
-          TextButton.icon(
-            onPressed: () {
-              // Opens video URL in new browser tab
-              // ignore: avoid_web_libraries_in_flutter
-              // dart:js_util is not needed — anchor click works via html.window
-            },
-            icon: const Icon(Icons.open_in_new_rounded, size: 16),
-            label: Text(
-              'Open video in new tab',
-              style: TextStyle(color: AppColors.primaryBlue.withValues(alpha: 0.8), fontSize: 13),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: SelectableText(
+              videoUrl,
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.grey.shade500,
+                fontFamily: 'monospace',
+              ),
             ),
           ),
         const SizedBox(height: AppSpacing.md),
         SecondaryButton(
-          label: 'Preview Video',
-          onPressed: () {
-            // Scroll back up to video — already visible
-          },
+          label: 'Back to Pipelines',
+          onPressed: () => context.goNamed(AppRoute.adminPipelines.routeName),
         ),
         const SizedBox(height: AppSpacing.sm),
         PrimaryButton(
@@ -203,7 +252,13 @@ class _DetailRow extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: <Widget>[
           Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          Flexible(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+              textAlign: TextAlign.end,
+            ),
+          ),
         ],
       ),
     );

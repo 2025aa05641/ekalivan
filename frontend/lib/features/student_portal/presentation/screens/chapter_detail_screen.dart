@@ -64,15 +64,17 @@ class ChapterDetailScreen extends ConsumerWidget {
 
   /// Navigates the student to the best available video source:
   /// 1. A locally cached offline video (fastest).
-  /// 2. Any COMPLETED job from the backend for any chapter (stream).
-  /// 3. Falls back to requesting a new generation via the demo chapter.
+  /// 2. Any COMPLETED job from the backend → student video player screen.
+  /// 3. Falls back to an informative snackbar.
   Future<void> _watchLesson(BuildContext context, WidgetRef ref) async {
     // 1. Check local offline cache first.
-    final List<VideoJobEntity> cached = await ref.read(videoRepositoryProvider).getOfflineCachedVideos();
+    final List<VideoJobEntity> cached =
+        await ref.read(videoRepositoryProvider).getOfflineCachedVideos();
     if (!context.mounted) return;
     VideoJobEntity? cachedLesson;
     try {
-      cachedLesson = cached.firstWhere((VideoJobEntity job) => job.taskId == chapterId);
+      cachedLesson =
+          cached.firstWhere((VideoJobEntity job) => job.taskId == chapterId);
     } catch (_) {
       cachedLesson = null;
     }
@@ -82,29 +84,33 @@ class ChapterDetailScreen extends ConsumerWidget {
     }
 
     // 2. Check backend for any COMPLETED job we can stream.
-    final List<RecentJobEntity> recentJobs = await ref.read(videoRepositoryProvider).getRecentJobs();
+    final List<RecentJobEntity> recentJobs =
+        await ref.read(videoRepositoryProvider).getRecentJobs();
     if (!context.mounted) return;
-    // Find the best matching job: prefer same subject/grade, then any completed job.
+
+    // Prefer an exact taskId match, then fall back to any completed job.
     RecentJobEntity? matchingJob;
     try {
       matchingJob = recentJobs.firstWhere(
-        (RecentJobEntity j) =>
-            j.status == 'COMPLETED' &&
-            j.taskId == chapterId,
+        (RecentJobEntity j) => j.status == 'COMPLETED' && j.taskId == chapterId,
       );
     } catch (_) {
-      // No exact match — try any completed job.
+      matchingJob = null;
+    }
+    if (matchingJob == null) {
       try {
         matchingJob = recentJobs.firstWhere(
-          (RecentJobEntity j) => j.status == 'COMPLETED' && j.taskId == chapterId,
+          (RecentJobEntity j) => j.status == 'COMPLETED',
         );
       } catch (_) {
         matchingJob = null;
       }
     }
+
     if (matchingJob != null) {
+      // Navigate to the student-specific video player (not the admin screen).
       context.pushNamed(
-        AppRoute.adminComplete.routeName,
+        AppRoute.studentVideoPlayer.routeName,
         pathParameters: <String, String>{'taskId': matchingJob.taskId},
       );
       return;
@@ -113,7 +119,9 @@ class ChapterDetailScreen extends ConsumerWidget {
     // 3. No video available — show informative snackbar.
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('No video is available yet for this chapter. Please check back soon!'),
+        content: Text(
+          'No video is available yet for this chapter. Please check back soon!',
+        ),
         duration: Duration(seconds: 3),
       ),
     );
@@ -121,10 +129,14 @@ class ChapterDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final String chapterSubtitle = _chapterSubtitles[chapterId] ?? 'Chapter $chapterId';
+    final String chapterSubtitle =
+        _chapterSubtitles[chapterId] ?? 'Chapter $chapterId';
     return AppScaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+        ),
         title: Text('Chapter $chapterId'),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(22),
@@ -138,12 +150,20 @@ class ChapterDetailScreen extends ConsumerWidget {
             ),
           ),
         ),
+        actions: <Widget>[
+          IconButton(
+            icon: const Icon(Icons.home_rounded),
+            tooltip: 'Student Home',
+            onPressed: () => context.goNamed(AppRoute.studentSplash.routeName),
+          ),
+        ],
       ),
-      bottomNavigationBar: const StudentBottomNav(current: StudentNavDestination.home),
+      bottomNavigationBar:
+          const StudentBottomNav(current: StudentNavDestination.home),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),
         children: <Widget>[
-          // Video player card — any chapter can now attempt to load a real video.
+          // Video player card — tapping opens the real video.
           VideoCard(
             title: chapterSubtitle,
             duration: '06:42',
@@ -152,7 +172,10 @@ class ChapterDetailScreen extends ConsumerWidget {
           const SizedBox(height: AppSpacing.lg),
           Text(
             'Topics in this Chapter',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: AppSpacing.sm),
           // Topics list
@@ -160,14 +183,23 @@ class ChapterDetailScreen extends ConsumerWidget {
             decoration: BoxDecoration(
               color: AppColors.card,
               borderRadius: BorderRadius.circular(14),
-              boxShadow: const [BoxShadow(color: Color(0x0A000000), blurRadius: 6, offset: Offset(0, 2))],
+              boxShadow: const [
+                BoxShadow(
+                    color: Color(0x0A000000),
+                    blurRadius: 6,
+                    offset: Offset(0, 2)),
+              ],
             ),
             child: Column(
               children: <Widget>[
                 for (int i = 0; i < _placeholderTopics.length; i++) ...<Widget>[
                   _TopicTile(topic: _placeholderTopics[i]),
                   if (i < _placeholderTopics.length - 1)
-                    const Divider(height: 1, indent: 56, endIndent: 16, color: AppColors.border),
+                    const Divider(
+                        height: 1,
+                        indent: 56,
+                        endIndent: 16,
+                        color: AppColors.border),
                 ],
               ],
             ),
@@ -199,7 +231,9 @@ class _TopicTile extends StatelessWidget {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              topic.unlocked ? Icons.check_rounded : Icons.lock_outline_rounded,
+              topic.unlocked
+                  ? Icons.check_rounded
+                  : Icons.lock_outline_rounded,
               color: topic.unlocked ? AppColors.success : Colors.grey,
               size: 16,
             ),
@@ -209,7 +243,8 @@ class _TopicTile extends StatelessWidget {
             topic.title,
             style: TextStyle(
               color: topic.unlocked ? const Color(0xFF0F172A) : Colors.grey,
-              fontWeight: topic.unlocked ? FontWeight.w600 : FontWeight.w400,
+              fontWeight:
+                  topic.unlocked ? FontWeight.w600 : FontWeight.w400,
               fontSize: 14,
             ),
           ),
