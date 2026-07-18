@@ -44,7 +44,7 @@ class _PipelineProgressScreenState extends ConsumerState<PipelineProgressScreen>
   String get taskId => widget.taskId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     ref.listen<AsyncValue<VideoStatusUpdateEntity>>(videoProgressProvider(taskId),
         (AsyncValue<VideoStatusUpdateEntity>? previous, AsyncValue<VideoStatusUpdateEntity> next) {
       next.whenData((VideoStatusUpdateEntity update) {

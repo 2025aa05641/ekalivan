@@ -16,6 +16,8 @@ import 'package:textbook_video_learning/features/video_generator/presentation/pr
 import 'package:textbook_video_learning/features/video_generator/presentation/widgets/video_player_view.dart';
 
 class _FakeRepository implements IVideoRepository {
+  @override
+  Future<String> uploadVideoSource({required List<int> bytes, required String filename}) => throw UnimplementedError();
   _FakeRepository(this._updates);
 
   final List<VideoStatusUpdateEntity> _updates;

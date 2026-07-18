@@ -10,6 +10,8 @@ import 'package:textbook_video_learning/features/video_generator/presentation/pr
 import 'package:textbook_video_learning/features/video_generator/presentation/screens/generation_screen.dart';
 
 class _FakeVideoRepository implements IVideoRepository {
+  @override
+  Future<String> uploadVideoSource({required List<int> bytes, required String filename}) => throw UnimplementedError();
   _FakeVideoRepository(this._updates);
 
   final List<VideoStatusUpdateEntity> _updates;

@@ -15,6 +15,8 @@ import 'package:textbook_video_learning/features/video_generator/domain/value_ob
 import 'package:textbook_video_learning/features/video_generator/presentation/providers/video_generation_provider.dart';
 
 class _FakeCreatorRepository implements IVideoRepository {
+  @override
+  Future<String> uploadVideoSource({required List<int> bytes, required String filename}) => throw UnimplementedError();
   _FakeCreatorRepository({this.jobToReturn, this.errorToThrow, this.updates = const <VideoStatusUpdateEntity>[]});
 
   final VideoJobEntity? jobToReturn;

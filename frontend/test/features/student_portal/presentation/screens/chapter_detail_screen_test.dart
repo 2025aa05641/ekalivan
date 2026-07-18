@@ -15,6 +15,8 @@ import 'package:textbook_video_learning/features/video_generator/presentation/sc
 import 'package:textbook_video_learning/features/video_generator/presentation/screens/generation_screen.dart';
 
 class _FakeRepository implements IVideoRepository {
+  @override
+  Future<String> uploadVideoSource({required List<int> bytes, required String filename}) => throw UnimplementedError();
   _FakeRepository({this.cached = const <VideoJobEntity>[], this.jobToReturn});
 
   final List<VideoJobEntity> cached;
