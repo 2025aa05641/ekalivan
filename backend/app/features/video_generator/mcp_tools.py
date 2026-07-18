@@ -492,6 +492,56 @@ class VeoVideoGenerationTool(IMcpTool):
         return generated[0].video
 
 
+class KaggleClipTool(IMcpTool):
+    """Picks up clips generated externally by the Wan2.1 Kaggle notebook.
+
+    ``RenderingSkill`` exports each job's beats to ``beats.json`` (see
+    ``clip_cache_key``), which is fed by hand into the Wan2.1 T2V Kaggle notebook. This
+    tool closes the loop on the read side: once the notebook's output clips are placed
+    in ``clips_dir`` (named ``<clip_cache_key>.mp4``, matching the export), it picks them
+    up automatically instead of requiring manual composition. A beat whose clip hasn't
+    been generated yet is simply absent from the result and falls back to the local
+    icon animation, the same graceful degradation as the Veo tool.
+    """
+
+    def __init__(self, clips_dir: Path) -> None:
+        """Create the tool with the directory the Kaggle notebook's clips are read from.
+
+        Args:
+            clips_dir: Directory containing ``<clip_cache_key>.mp4`` files produced by
+                the Kaggle notebook.
+        """
+        self._clips_dir = clips_dir
+
+    async def execute(self, **kwargs: object) -> object:
+        """Look up each beat's pre-generated clip by its cache key.
+
+        Args:
+            kwargs: Must contain ``beats`` (list of mappings with at least ``id``).
+
+        Returns:
+            A ``dict`` mapping each beat's ``id`` to its clip's local path, for beats
+            whose clip is present in ``clips_dir``. Beats without one are simply absent.
+
+        Raises:
+            TypeError: If the required ``beats`` argument is missing or the wrong type.
+        """
+        beats = kwargs.get("beats")
+        if not isinstance(beats, list):
+            raise TypeError("KaggleClipTool requires a list 'beats' argument.")
+
+        clip_paths: dict[str, str] = {}
+        for beat in beats:
+            assert isinstance(beat, Mapping)
+            beat_id = str(beat["id"])
+            candidate = self._clips_dir / f"{beat_id}.mp4"
+            if await aiofiles.os.path.exists(str(candidate)):
+                clip_paths[beat_id] = str(candidate)
+            else:
+                logger.info("No Kaggle-generated clip found for beat %s; it will use the local fallback.", beat_id)
+        return clip_paths
+
+
 class MoviePyTool(IMcpTool):
     """Composites narrated beats into one animated, illustrated video via MoviePy.
 

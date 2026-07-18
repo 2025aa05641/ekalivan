@@ -22,6 +22,7 @@ from app.features.video_generator.graph import build_video_generation_graph
 from app.features.video_generator.mcp_tools import (
     EdgeTtsTool,
     FFmpegTool,
+    KaggleClipTool,
     MarkItDownTool,
     MoviePyTool,
     VeoVideoGenerationTool,
@@ -66,7 +67,7 @@ def create_app(
     composition_tool: IMcpTool | None = None,
     encode_tool: IMcpTool | None = None,
     storage_tool: IMcpTool | None = None,
-    veo_tool: IMcpTool | None = None,
+    clip_tool: IMcpTool | None = None,
     max_concurrent_render_jobs: int | None = None,
 ) -> FastAPI:
     """Build the configured API application for production or test use.
@@ -80,10 +81,11 @@ def create_app(
         composition_tool: Assembly-stage composition MCP tool to use in place of ``MoviePyTool``.
         encode_tool: Assembly-stage encode MCP tool to use in place of ``FFmpegTool``.
         storage_tool: Publishing-stage MCP tool to use in place of ``StorageTool``.
-        veo_tool: Assembly-stage MCP tool that generates real video clips per beat (Veo).
+        clip_tool: Assembly-stage MCP tool that supplies real video clips per beat, chosen
+            by ``VIDEO_CLIP_PROVIDER`` (``VeoVideoGenerationTool`` or ``KaggleClipTool``).
             Unlike the other tools, this has no settings-based default here — a caller must
-            opt in explicitly, since constructing it wires a billed external API. Production
-            wiring lives at this module's bottom, gated on ``settings.google_api_key``.
+            opt in explicitly, since the "veo" provider wires a billed external API.
+            Production wiring lives at this module's bottom, via ``_build_clip_tool``.
         max_concurrent_render_jobs: Render-slot cap to use in place of ``settings.max_concurrent_render_jobs``.
 
     Returns:
@@ -100,13 +102,17 @@ def create_app(
     if llm_provider is None:
         app.state.llm_http_client = httpx.AsyncClient(timeout=settings.ollama_timeout_seconds)
         primary_llm_provider: ILlmProvider = OllamaProvider(
-            base_url=settings.ollama_base_url, model=settings.ollama_model, client=app.state.llm_http_client
+            base_url=settings.ollama_base_url,
+            model=settings.ollama_model,
+            client=app.state.llm_http_client,
+            num_ctx=settings.ollama_num_ctx,
         )
         if settings.ollama_fallback_model:
             fallback_llm_provider = OllamaProvider(
                 base_url=settings.ollama_base_url,
                 model=settings.ollama_fallback_model,
                 client=app.state.llm_http_client,
+                num_ctx=settings.ollama_num_ctx,
             )
             llm_provider = FallbackLlmProvider([primary_llm_provider, fallback_llm_provider])
         else:
@@ -121,7 +127,7 @@ def create_app(
         static_assets_dir / "video",
         storage_tool or StorageTool(),
         static_assets_dir,
-        veo_tool,
+        clip_tool,
     )
     app.state.render_semaphore = asyncio.Semaphore(max_concurrent_render_jobs or settings.max_concurrent_render_jobs)
     app.state.background_tasks = set()
@@ -146,17 +152,28 @@ def create_app(
     return app
 
 
-def _build_default_veo_tool() -> IMcpTool | None:
-    """Construct the production Veo tool from settings, or ``None`` if unconfigured.
+def _build_clip_tool() -> IMcpTool | None:
+    """Construct the production Assembly-stage clip tool selected by ``VIDEO_CLIP_PROVIDER``.
 
     Returns:
-        A ``VeoVideoGenerationTool`` wired to the configured API key, or ``None`` when
-        ``GOOGLE_API_KEY`` isn't set — rendering then falls back to local icon animation.
+        A ``VeoVideoGenerationTool`` (provider ``"veo"``), a ``KaggleClipTool`` (provider
+        ``"kaggle"``), or ``None`` (provider ``"local"``, the default) — rendering then
+        falls back to the composition tool's local icon animation for every beat.
+
+    Raises:
+        RuntimeError: If ``VIDEO_CLIP_PROVIDER`` selects a provider whose required setting
+            (``GOOGLE_API_KEY`` for ``"veo"``, ``KAGGLE_CLIPS_DIR`` for ``"kaggle"``) isn't set.
     """
     settings = get_settings()
-    if not settings.google_api_key:
-        return None
-    return VeoVideoGenerationTool(genai.Client(api_key=settings.google_api_key), settings.veo_model)
+    if settings.video_clip_provider == "veo":
+        if not settings.google_api_key:
+            raise RuntimeError("VIDEO_CLIP_PROVIDER=veo requires GOOGLE_API_KEY to be set.")
+        return VeoVideoGenerationTool(genai.Client(api_key=settings.google_api_key), settings.veo_model)
+    if settings.video_clip_provider == "kaggle":
+        if not settings.kaggle_clips_dir:
+            raise RuntimeError("VIDEO_CLIP_PROVIDER=kaggle requires KAGGLE_CLIPS_DIR to be set.")
+        return KaggleClipTool(Path(settings.kaggle_clips_dir))
+    return None
 
 
-app = create_app(veo_tool=_build_default_veo_tool())
+app = create_app(clip_tool=_build_clip_tool())

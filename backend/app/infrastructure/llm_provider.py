@@ -18,6 +18,7 @@ class OllamaProvider(ILlmProvider):
         *,
         max_attempts: int = 2,
         initial_retry_delay_seconds: float = 2.0,
+        num_ctx: int = 8192,
     ) -> None:
         """Create the provider with its target server, model, and HTTP client.
 
@@ -27,12 +28,16 @@ class OllamaProvider(ILlmProvider):
             client: Async HTTP client used for requests; its lifecycle is owned by the caller.
             max_attempts: Total completion attempts before a transient failure propagates.
             initial_retry_delay_seconds: Delay before the first retry.
+            num_ctx: Context window (in tokens) requested from Ollama. Left unset, Ollama
+                falls back to a small default context and silently truncates prompts longer
+                than that, dropping most of a parsed chapter before the model sees it.
         """
         self._base_url = base_url.rstrip("/")
         self._model = model
         self._client = client
         self._max_attempts = max_attempts
         self._initial_retry_delay_seconds = initial_retry_delay_seconds
+        self._num_ctx = num_ctx
 
     async def complete(self, prompt: str, response_schema: type[ResponseModel]) -> ResponseModel:
         """Complete a prompt and validate the response against ``response_schema``.
@@ -56,6 +61,7 @@ class OllamaProvider(ILlmProvider):
                     "prompt": prompt,
                     "stream": False,
                     "format": response_schema.model_json_schema(),
+                    "options": {"num_ctx": self._num_ctx},
                 },
             )
             http_response.raise_for_status()

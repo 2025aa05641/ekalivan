@@ -11,6 +11,7 @@ from google.genai import errors as genai_errors
 from app.features.video_generator.mcp_tools import (
     EdgeTtsTool,
     FFmpegTool,
+    KaggleClipTool,
     MarkItDownTool,
     MoviePyTool,
     VeoVideoGenerationTool,
@@ -336,6 +337,29 @@ async def test_veo_execute_requires_beats_list_and_cache_dir() -> None:
 
     with pytest.raises(TypeError):
         await tool.execute(beats="not-a-list", cache_dir="unused")
+
+
+async def test_kaggle_tool_returns_paths_for_clips_present_in_the_directory(tmp_path: Path) -> None:
+    """A beat whose clip file exists in clips_dir is included, keyed by its id."""
+    (tmp_path / "beat-1.mp4").write_bytes(b"fake clip")
+    tool = KaggleClipTool(tmp_path)
+
+    clip_paths = await tool.execute(
+        beats=[
+            {"id": "beat-1", "visual_prompt": "a sunlit leaf", "duration_seconds": 4.0},
+            {"id": "beat-2", "visual_prompt": "a cold glass of water", "duration_seconds": 3.0},
+        ]
+    )
+
+    assert clip_paths == {"beat-1": str(tmp_path / "beat-1.mp4")}
+
+
+async def test_kaggle_tool_requires_a_beats_list() -> None:
+    """The tool rejects a missing/wrong-typed 'beats' argument."""
+    tool = KaggleClipTool(Path("unused"))
+
+    with pytest.raises(TypeError):
+        await tool.execute(beats="not-a-list")
 
 
 async def test_ffmpeg_execute_produces_a_faststart_video(tmp_path: Path) -> None:

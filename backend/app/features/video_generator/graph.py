@@ -43,7 +43,7 @@ def build_video_generation_graph(
     rendering_output_dir: Path,
     storage_tool: IMcpTool,
     static_assets_dir: Path,
-    veo_tool: IMcpTool | None = None,
+    clip_tool: IMcpTool | None = None,
 ) -> CompiledStateGraph[VideoGenerationState]:
     """Compile the linear video-generation graph.
 
@@ -57,8 +57,9 @@ def build_video_generation_graph(
         rendering_output_dir: Base directory under which per-job rendered video files are written.
         storage_tool: MCP tool used by the Publishing agent to validate output and write its manifest.
         static_assets_dir: Root directory served as static assets, used to derive the public video URL.
-        veo_tool: Optional MCP tool that generates real video clips per beat (Veo). Omit to
-            render every beat with the composition tool's local, no-cost animation.
+        clip_tool: Optional MCP tool that supplies real video clips per beat (Veo or Kaggle,
+            per ``VIDEO_CLIP_PROVIDER``). Omit to render every beat with the composition
+            tool's local, no-cost animation.
 
     Returns:
         A compiled graph that runs the full Intake-to-Publishing chain: parsing, structuring,
@@ -81,7 +82,7 @@ def build_video_generation_graph(
         "video_rendering",
         with_node_telemetry(
             "video_rendering",
-            VideoRenderingAgent(RenderingSkill(composition_tool, encode_tool, rendering_output_dir, veo_tool)),
+            VideoRenderingAgent(RenderingSkill(composition_tool, encode_tool, rendering_output_dir, clip_tool)),
         ),
     )
     graph.add_node(

@@ -1,6 +1,7 @@
 """Application configuration loaded from the environment."""
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -23,9 +24,12 @@ class Settings(BaseSettings):
     ollama_model: str = "gemma4:latest"
     ollama_fallback_model: str | None = None
     ollama_timeout_seconds: float = Field(default=120.0, gt=0)
+    ollama_num_ctx: int = Field(default=8192, ge=256)
     max_concurrent_render_jobs: int = Field(default=2, ge=1)
     google_api_key: str | None = None
     veo_model: str = "veo-3.1-fast-generate-preview"
+    video_clip_provider: Literal["local", "veo", "kaggle"] = "local"
+    kaggle_clips_dir: str | None = None
 
     @property
     def cors_origins(self) -> list[str]:
