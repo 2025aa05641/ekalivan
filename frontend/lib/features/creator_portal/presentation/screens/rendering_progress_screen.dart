@@ -25,6 +25,22 @@ class RenderingProgressScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen<AsyncValue<VideoStatusUpdateEntity>>(videoProgressProvider(taskId),
+        (AsyncValue<VideoStatusUpdateEntity>? previous, AsyncValue<VideoStatusUpdateEntity> next) {
+      next.whenData((VideoStatusUpdateEntity update) {
+        if (update.status != 'COMPLETED' || update.videoUrl == null) return;
+        ref.invalidate(recentJobsProvider);
+        ref.invalidate(myVideosProvider);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (context.mounted) {
+            context.goNamed(
+              AppRoute.adminComplete.routeName,
+              pathParameters: <String, String>{'taskId': taskId},
+            );
+          }
+        });
+      });
+    });
     final AsyncValue<VideoStatusUpdateEntity> progress = ref.watch(videoProgressProvider(taskId));
     return AppScaffold(
       appBar: AppBar(
@@ -32,7 +48,7 @@ class RenderingProgressScreen extends ConsumerWidget {
           onPressed: () =>
               context.goNamed(AppRoute.adminPipeline.routeName, pathParameters: <String, String>{'taskId': taskId}),
         ),
-        title: const Text('Pipeline - Step 5'),
+        title: const Text('Pipeline - Step 7'),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(24),
           child: Container(

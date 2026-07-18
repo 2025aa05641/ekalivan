@@ -88,6 +88,20 @@ class JobStatusResponseModel {
     // Use actual field presence to compute real progress.
     if (status == 'COMPLETED') return 100;
     if (status == 'FAILED') return 0;
+    // Accept both the canonical backend labels and lowercase labels from an
+    // older worker during rollout.
+    final double? normalizedNodeProgress = switch (progressNode?.toLowerCase()) {
+      'textbook parsing' => 5,
+      'curriculum mapping' => 18,
+      'lesson planning' => 31,
+      'teacher script' => 44,
+      'storyboard' => 57,
+      'narration (tts)' => 70,
+      'video rendering' => 83,
+      'publishing' => 94,
+      _ => null,
+    };
+    if (normalizedNodeProgress != null) return normalizedNodeProgress;
     // Mirror the named nodes sent by the backend LangGraph pipeline. These
     // values are authoritative while a job is processing.
     final double? nodeProgress = switch (progressNode) {

@@ -27,7 +27,7 @@ const List<String> pipelineStageNames = <String>[
 ];
 
 /// Shows the 8-step AI pipeline for the job identified by [taskId].
-class PipelineProgressScreen extends ConsumerWidget {
+class PipelineProgressScreen extends ConsumerStatefulWidget {
   /// Creates the pipeline progress screen for [taskId].
   const PipelineProgressScreen({super.key, required this.taskId});
 
@@ -35,7 +35,34 @@ class PipelineProgressScreen extends ConsumerWidget {
   final String taskId;
 
   @override
+  ConsumerState<PipelineProgressScreen> createState() => _PipelineProgressScreenState();
+}
+
+class _PipelineProgressScreenState extends ConsumerState<PipelineProgressScreen> {
+  bool _completionHandled = false;
+
+  String get taskId => widget.taskId;
+
+  @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen<AsyncValue<VideoStatusUpdateEntity>>(videoProgressProvider(taskId),
+        (AsyncValue<VideoStatusUpdateEntity>? previous, AsyncValue<VideoStatusUpdateEntity> next) {
+      next.whenData((VideoStatusUpdateEntity update) {
+        if (_completionHandled || update.status != 'COMPLETED' || update.videoUrl == null) {
+          return;
+        }
+        _completionHandled = true;
+        ref.invalidate(recentJobsProvider);
+        ref.invalidate(myVideosProvider);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          context.goNamed(
+            AppRoute.adminComplete.routeName,
+            pathParameters: <String, String>{'taskId': taskId},
+          );
+        });
+      });
+    });
     final AsyncValue<VideoStatusUpdateEntity> progress = ref.watch(videoProgressProvider(taskId));
     final AsyncValue<List<RecentJobEntity>> recentJobsAsync = ref.watch(recentJobsProvider);
 
