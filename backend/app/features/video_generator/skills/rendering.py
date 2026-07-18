@@ -54,7 +54,7 @@ class RenderingSkill:
         composition_tool: IMcpTool,
         encode_tool: IMcpTool,
         base_output_dir: Path,
-        veo_tool: IMcpTool | None = None,
+        clip_tool: IMcpTool | None = None,
     ) -> None:
         """Create the skill with its injected composition and encode tools.
 
@@ -62,14 +62,15 @@ class RenderingSkill:
             composition_tool: MCP tool that composites beats into one video (MoviePy).
             encode_tool: MCP tool that re-encodes the composed video for streaming (FFmpeg).
             base_output_dir: Directory under which per-job rendered video files are written.
-            veo_tool: Optional MCP tool that generates real video clips per beat (Veo).
-                When omitted, every beat falls back to the composition tool's local
-                animation — rendering never depends on Veo being configured or funded.
+            clip_tool: Optional MCP tool that supplies real video clips per beat (Veo or
+                Kaggle, per ``VIDEO_CLIP_PROVIDER``). When omitted, every beat falls back
+                to the composition tool's local animation — rendering never depends on an
+                external clip source being configured.
         """
         self._composition_tool = composition_tool
         self._encode_tool = encode_tool
         self._base_output_dir = base_output_dir
-        self._veo_tool = veo_tool
+        self._clip_tool = clip_tool
 
     async def render_video(self, narrated_beats: list[NarratedBeat], task_id: str) -> str:
         """Composite narrated beats and produce the final fast-start video.
@@ -90,13 +91,13 @@ class RenderingSkill:
         await self._write_beats_manifest(narrated_beats, job_dir)
 
         clip_paths: object = {}
-        if self._veo_tool is not None:
-            veo_beats = [
+        if self._clip_tool is not None:
+            clip_beats = [
                 {"id": clip_cache_key(beat.visual_prompt), "visual_prompt": beat.visual_prompt,
                  "duration_seconds": beat.duration_seconds}
                 for beat in narrated_beats
             ]
-            clip_paths = await self._veo_tool.execute(beats=veo_beats, cache_dir=str(job_dir / "veo_clips"))
+            clip_paths = await self._clip_tool.execute(beats=clip_beats, cache_dir=str(job_dir / "veo_clips"))
 
         await self._composition_tool.execute(
             beats=[beat.model_dump() for beat in narrated_beats],

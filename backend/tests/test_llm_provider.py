@@ -23,6 +23,7 @@ async def test_complete_returns_validated_response() -> None:
         assert body["model"] == "llama3.1"
         assert body["stream"] is False
         assert body["format"] == _EchoResponse.model_json_schema()
+        assert body["options"]["num_ctx"] == 8192
         return httpx.Response(200, json={"response": json.dumps({"value": "hello"})})
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
@@ -86,4 +87,23 @@ async def test_complete_retries_after_a_transient_failure() -> None:
 
     assert result == _EchoResponse(value="recovered")
     assert attempts == 2
+    await client.aclose()
+
+
+async def test_complete_sends_configured_num_ctx() -> None:
+    """A custom num_ctx is forwarded so large parsed chapters aren't silently truncated."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        assert body["options"]["num_ctx"] == 32768
+        return httpx.Response(200, json={"response": json.dumps({"value": "hello"})})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    provider = OllamaProvider(
+        base_url="http://localhost:11434", model="llama3.1", client=client, num_ctx=32768
+    )
+
+    result = await provider.complete("prompt text", _EchoResponse)
+
+    assert result == _EchoResponse(value="hello")
     await client.aclose()
