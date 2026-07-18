@@ -4,6 +4,7 @@ library;
 import '../../../../core/network/api_client.dart';
 import '../../domain/value_objects/video_generation_request_params.dart';
 import '../models/job_status_response_model.dart';
+import '../models/recent_job_model.dart';
 import '../models/video_generation_response_model.dart';
 
 /// Isolates raw HTTP request and response mapping from the repository.
@@ -31,5 +32,15 @@ class VideoRemoteDataSource {
   Future<JobStatusResponseModel> getStatus(String taskId) async {
     final Map<String, Object?> response = await _apiClient.get('/api/v1/videos/$taskId');
     return JobStatusResponseModel.fromJson(response);
+  }
+
+  /// Fetches the most recent jobs from the list endpoint.
+  Future<List<RecentJobModel>> getRecentJobs({int limit = 20}) async {
+    final List<Object?> response =
+        await _apiClient.getList('/api/v1/videos/?limit=$limit');
+    return response
+        .whereType<Map<String, Object?>>()
+        .map(RecentJobModel.fromJson)
+        .toList();
   }
 }

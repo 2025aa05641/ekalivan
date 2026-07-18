@@ -15,11 +15,11 @@ enum StudentNavDestination {
   /// Previously watched videos.
   myVideos(Icons.video_library_rounded, 'My Videos', AppRoute.myVideos),
 
-  /// Downloaded-for-offline videos (placeholder — not yet a real screen).
-  downloads(Icons.download_rounded, 'Downloads', null),
+  /// Downloaded-for-offline videos.
+  downloads(Icons.download_rounded, 'Downloads', AppRoute.studentDownloads),
 
-  /// Student profile (placeholder — not yet a real screen).
-  profile(Icons.person_rounded, 'Profile', null);
+  /// Student profile.
+  profile(Icons.person_rounded, 'Profile', AppRoute.studentProfile);
 
   const StudentNavDestination(this.icon, this.label, this.route);
 

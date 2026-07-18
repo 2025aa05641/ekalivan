@@ -20,33 +20,41 @@ class ClassSelectionScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String mediumLabel = medium == 'tamil' ? 'Tamil Medium' : 'English Medium';
     return AppScaffold(
-      appBar: AppBar(title: Text(mediumLabel)),
+      appBar: AppBar(
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        title: Text(medium == 'tamil' ? 'தமிழ் வழி' : 'English Medium'),
+      ),
       bottomNavigationBar: const StudentBottomNav(current: StudentNavDestination.home),
       body: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text('Choose Your Class', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              'Choose Your Class',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: AppSpacing.md),
             Expanded(
-              child: GridView.count(
-                crossAxisCount: 3,
-                crossAxisSpacing: AppSpacing.sm,
-                mainAxisSpacing: AppSpacing.sm,
-                childAspectRatio: 1.1,
-                children: <Widget>[
-                  for (int grade = 1; grade <= 12; grade++)
-                    _GradeTile(
-                      grade: grade,
-                      onTap: () => context.goNamed(
-                        AppRoute.studentSubject.routeName,
-                        pathParameters: <String, String>{'medium': medium, 'grade': '$grade'},
-                      ),
+              child: GridView.builder(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                  childAspectRatio: 1.0,
+                ),
+                itemCount: 12,
+                itemBuilder: (BuildContext context, int index) {
+                  final int grade = index + 1;
+                  return _GradeTile(
+                    grade: grade,
+                    onTap: () => context.pushNamed(
+                      AppRoute.studentSubject.routeName,
+                      pathParameters: <String, String>{'medium': medium, 'grade': '$grade'},
                     ),
-                ],
+                  );
+                },
               ),
             ),
           ],
@@ -69,17 +77,38 @@ class _GradeTile extends StatelessWidget {
       label: 'Grade $grade',
       child: Material(
         color: AppColors.card,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           onTap: onTap,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              const Icon(Icons.school_rounded, color: AppColors.primaryBlue),
-              const SizedBox(height: AppSpacing.xs),
-              Text('Grade $grade', style: Theme.of(context).textTheme.bodyMedium),
-            ],
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: const [BoxShadow(color: Color(0x0A000000), blurRadius: 6, offset: Offset(0, 2))],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryBlue.withValues(alpha: 0.08),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.school_rounded, color: AppColors.primaryBlue, size: 20),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Grade $grade',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

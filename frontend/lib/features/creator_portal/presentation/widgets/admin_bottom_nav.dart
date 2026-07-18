@@ -12,17 +12,17 @@ enum AdminNavDestination {
   /// Admin dashboard.
   dashboard(Icons.dashboard_rounded, 'Dashboard', AppRoute.adminDashboard),
 
-  /// Book library (placeholder — not yet a real screen).
-  books(Icons.menu_book_rounded, 'Books', null),
+  /// Book library.
+  books(Icons.menu_book_rounded, 'Books', AppRoute.adminBooks),
 
-  /// AI pipeline progress.
-  pipeline(Icons.timeline_rounded, 'Pipeline', AppRoute.adminPipeline),
+  /// AI pipeline progress list.
+  pipeline(Icons.timeline_rounded, 'Pipeline', AppRoute.adminPipelines),
 
-  /// Published videos (placeholder — not yet a real screen).
-  videos(Icons.video_library_rounded, 'Videos', null),
+  /// Published videos.
+  videos(Icons.video_library_rounded, 'Videos', AppRoute.adminVideos),
 
-  /// Admin profile (placeholder — not yet a real screen).
-  profile(Icons.person_rounded, 'Profile', null);
+  /// Admin profile.
+  profile(Icons.person_rounded, 'Profile', AppRoute.adminProfile);
 
   const AdminNavDestination(this.icon, this.label, this.route);
 
@@ -32,8 +32,8 @@ enum AdminNavDestination {
   /// Label shown under the icon.
   final String label;
 
-  /// Route navigated to when tapped, or null for not-yet-built destinations.
-  final AppRoute? route;
+  /// Route navigated to when tapped.
+  final AppRoute route;
 }
 
 /// Wraps [BottomNav] with the Creator portal's fixed destination set.
@@ -53,10 +53,7 @@ class AdminBottomNav extends StatelessWidget {
       ],
       currentIndex: current.index,
       onTap: (int index) {
-        final AppRoute? route = AdminNavDestination.values[index].route;
-        if (route != null) {
-          context.goNamed(route.routeName);
-        }
+        context.goNamed(AdminNavDestination.values[index].route.routeName);
       },
     );
   }

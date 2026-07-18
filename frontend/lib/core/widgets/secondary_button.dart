@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme_extension.dart';
 
-/// White, blue-outlined button used alongside a [PrimaryButton].
+/// Blue-outlined button used alongside a [PrimaryButton].
 class SecondaryButton extends StatelessWidget {
   /// Creates the secondary button.
   const SecondaryButton({super.key, required this.label, required this.onPressed});
@@ -27,6 +27,7 @@ class SecondaryButton extends StatelessWidget {
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           backgroundColor: AppColors.card,
+          foregroundColor: AppColors.primaryBlue,
           side: const BorderSide(color: AppColors.primaryBlue, width: 1.5),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(tokens.buttonRadius)),
         ),

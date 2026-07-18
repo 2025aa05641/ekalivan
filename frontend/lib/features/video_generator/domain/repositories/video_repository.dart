@@ -1,4 +1,4 @@
-/// Repository contract for generation and offline playback support.
+import '../entities/recent_job_entity.dart';
 import '../entities/video_job_entity.dart';
 import '../entities/video_status_update_entity.dart';
 import '../value_objects/video_generation_request_params.dart';
@@ -13,4 +13,7 @@ abstract interface class IVideoRepository {
 
   /// Returns previously completed video jobs cached for offline access.
   Future<List<VideoJobEntity>> getOfflineCachedVideos();
+
+  /// Fetches the most recent generation jobs from the server.
+  Future<List<RecentJobEntity>> getRecentJobs({int limit = 20});
 }

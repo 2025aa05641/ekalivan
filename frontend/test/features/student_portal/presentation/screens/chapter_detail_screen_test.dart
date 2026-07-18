@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:textbook_video_learning/core/widgets/video_card.dart';
 import 'package:textbook_video_learning/features/student_portal/presentation/screens/chapter_detail_screen.dart';
+import 'package:textbook_video_learning/features/video_generator/domain/entities/recent_job_entity.dart';
 import 'package:textbook_video_learning/features/video_generator/domain/entities/video_job_entity.dart';
 import 'package:textbook_video_learning/features/video_generator/domain/entities/video_status_update_entity.dart';
 import 'package:textbook_video_learning/features/video_generator/domain/repositories/video_repository.dart';
@@ -29,6 +30,9 @@ class _FakeRepository implements IVideoRepository {
 
   @override
   Future<List<VideoJobEntity>> getOfflineCachedVideos() async => cached;
+
+  @override
+  Future<List<RecentJobEntity>> getRecentJobs({int limit = 20}) async => <RecentJobEntity>[];
 }
 
 /// Minimal router covering just what ChapterDetailScreen navigates to,

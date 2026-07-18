@@ -9,7 +9,6 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/accessible_error_widget.dart';
 import '../../../../core/widgets/app_scaffold.dart';
-import '../../../../core/widgets/dashboard_card.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../../video_generator/domain/entities/video_status_update_entity.dart';
 import '../../../video_generator/presentation/providers/router_provider.dart';
@@ -34,6 +33,18 @@ class RenderingProgressScreen extends ConsumerWidget {
               context.goNamed(AppRoute.adminPipeline.routeName, pathParameters: <String, String>{'taskId': taskId}),
         ),
         title: const Text('Pipeline - Step 5'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(24),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.only(bottom: 8),
+            child: const Text(
+              'Video Rendering',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white60, fontSize: 13),
+            ),
+          ),
+        ),
       ),
       body: progress.when(
         data: (VideoStatusUpdateEntity update) => _RenderingBody(taskId: taskId, update: update),
@@ -64,45 +75,115 @@ class _RenderingBody extends StatelessWidget {
         child: AccessibleErrorWidget(message: update.errorMessage ?? 'The video could not be rendered.'),
       );
     }
+
+    // Simulated stats for mockup
+    const String estimatedTime = '00:03:45';
+    const String currentTopic = 'Photosynthesis';
+    const String progressText = '12/18 Topics';
+
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.md),
       children: <Widget>[
-        const Text('Video Rendering', style: TextStyle(color: Colors.grey)),
-        const SizedBox(height: AppSpacing.lg),
-        DashboardCard(
+        // Video rendering card
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: const [BoxShadow(color: Color(0x0F000000), blurRadius: 8, offset: Offset(0, 2))],
+          ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Center(
-                child: Column(
-                  children: <Widget>[
-                    const Icon(Icons.movie_creation_rounded, size: 56, color: AppColors.primaryBlue),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text('Rendering Video', style: Theme.of(context).textTheme.titleLarge),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(update.currentNode, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
-                  ],
+              // Camera icon
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryBlue.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.movie_creation_rounded, size: 36, color: AppColors.primaryBlue),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Rendering Video',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                update.currentNode,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.grey, fontSize: 13),
+              ),
+              const SizedBox(height: 24),
+              // Progress bar
+              Stack(
+                children: [
+                  Container(
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  FractionallySizedBox(
+                    widthFactor: update.progress / 100,
+                    child: Container(
+                      height: 10,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [AppColors.primaryBlue, AppColors.primaryPurple],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  '${update.progress.round()}%',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primaryBlue,
+                    fontSize: 13,
+                  ),
                 ),
               ),
-              const SizedBox(height: AppSpacing.lg),
-              ClipRRect(
-                borderRadius: const BorderRadius.all(Radius.circular(8)),
-                child: LinearProgressIndicator(
-                  value: update.progress / 100,
-                  minHeight: 8,
-                  backgroundColor: AppColors.border,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              _StatRow(label: 'Progress', value: '${update.progress.round()}%'),
+              const SizedBox(height: 16),
+              const Divider(height: 1, color: AppColors.border),
+              const SizedBox(height: 16),
+              _StatRow(label: 'Estimated Time Remaining', value: estimatedTime),
+              const SizedBox(height: 8),
+              _StatRow(label: 'Current Topic', value: currentTopic),
+              const SizedBox(height: 8),
+              _StatRow(label: 'Progress', value: progressText),
             ],
           ),
         ),
         const SizedBox(height: AppSpacing.md),
-        const Text(
-          'You will be notified once the video is ready.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.grey),
+        // Notification banner
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppColors.primaryBlue.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.primaryBlue.withValues(alpha: 0.2)),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.notifications_active_outlined, color: AppColors.primaryBlue, size: 18),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'You will be notified once the video is ready.',
+                  style: TextStyle(color: AppColors.primaryBlue, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: AppSpacing.md),
         PrimaryButton(
@@ -125,15 +206,12 @@ class _StatRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: <Widget>[
-          Text(label, style: const TextStyle(color: Colors.grey)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
-        ],
-      ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: <Widget>[
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+      ],
     );
   }
 }

@@ -52,3 +52,14 @@ class VideoGenerationService:
             Total job count, per-status counts, and mean completion time.
         """
         return await self._repository.get_metrics()
+
+    async def list_jobs(self, limit: int = 20) -> list[VideoJob]:
+        """Return the most recently created jobs, newest first.
+
+        Args:
+            limit: Maximum number of jobs to return.
+
+        Returns:
+            Up to ``limit`` jobs ordered by created_at descending.
+        """
+        return await self._repository.list_jobs(limit=limit)

@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.features.video_generator.db_models import VideoJob
@@ -137,6 +137,20 @@ class VideoJobRepository:
             counts_by_status=counts_by_status,
             average_completion_seconds=average_completion_seconds,
         )
+
+    async def list_jobs(self, limit: int = 20) -> list[VideoJob]:
+        """Return the most recently created jobs, newest first.
+
+        Args:
+            limit: Maximum number of jobs to return.
+
+        Returns:
+            Up to ``limit`` jobs ordered by ``created_at`` descending.
+        """
+        result = await self._session.execute(
+            select(VideoJob).order_by(desc(VideoJob.created_at)).limit(limit)
+        )
+        return list(result.scalars().all())
 
     async def mark_failed(self, task_id: UUID, error_message: str) -> VideoJob | None:
         """Record a pipeline failure without raising past the background task.

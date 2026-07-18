@@ -1,7 +1,7 @@
 """PublishingSkill: validates the rendered video and registers it in the cache manifest."""
 
 import json
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from app.core.interfaces import IMcpTool
@@ -49,7 +49,7 @@ class PublishingSkill:
             "output_video_path": output_video_path,
             "video_url": video_url,
             "file_size_bytes": file_size,
-            "published_at": datetime.now(UTC).isoformat(),
+            "published_at": datetime.now(timezone.utc).isoformat(),
         }
         manifest_path = Path(output_video_path).parent / "manifest.json"
         await self._storage_tool.execute(

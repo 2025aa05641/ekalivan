@@ -49,10 +49,35 @@ class ApiClient {
     );
   }
 
+  /// Sends a GET request and returns the decoded list response.
+  ///
+  /// Explicitly disables caching similarly to [get].
+  Future<List<Object?>> getList(String path) async {
+    return _sendList(
+      () => _dio.get<List<Object?>>(
+        path,
+        options: Options(headers: const <String, String>{'Cache-Control': 'no-cache'}),
+      ),
+    );
+  }
+
   Future<Map<String, Object?>> _send(Future<Response<Map<String, Object?>>> Function() request) async {
     try {
       final Response<Map<String, Object?>> response = await request();
       return response.data ?? <String, Object?>{};
+    } on DioException catch (error) {
+      final Object? cause = error.error;
+      if (cause is ApiException) {
+        throw cause;
+      }
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<List<Object?>> _sendList(Future<Response<List<Object?>>> Function() request) async {
+    try {
+      final Response<List<Object?>> response = await request();
+      return response.data ?? <Object?>[];
     } on DioException catch (error) {
       final Object? cause = error.error;
       if (cause is ApiException) {

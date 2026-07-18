@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:textbook_video_learning/features/video_generator/domain/entities/recent_job_entity.dart';
 import 'package:textbook_video_learning/features/video_generator/domain/entities/video_job_entity.dart';
 import 'package:textbook_video_learning/features/video_generator/domain/entities/video_status_update_entity.dart';
 import 'package:textbook_video_learning/features/video_generator/domain/repositories/video_repository.dart';
@@ -25,6 +26,9 @@ class _FakeVideoRepository implements IVideoRepository {
 
   @override
   Future<List<VideoJobEntity>> getOfflineCachedVideos() async => <VideoJobEntity>[];
+
+  @override
+  Future<List<RecentJobEntity>> getRecentJobs({int limit = 20}) async => <RecentJobEntity>[];
 }
 
 Future<void> _pumpGenerationScreen(WidgetTester tester, List<VideoStatusUpdateEntity> updates) async {

@@ -7,6 +7,7 @@ import 'package:textbook_video_learning/features/creator_portal/presentation/scr
 import 'package:textbook_video_learning/features/creator_portal/presentation/screens/login_screen.dart';
 import 'package:textbook_video_learning/features/creator_portal/presentation/screens/pipeline_progress_screen.dart';
 import 'package:textbook_video_learning/features/creator_portal/presentation/screens/upload_book_screen.dart';
+import 'package:textbook_video_learning/features/video_generator/domain/entities/recent_job_entity.dart';
 import 'package:textbook_video_learning/features/video_generator/domain/entities/video_job_entity.dart';
 import 'package:textbook_video_learning/features/video_generator/domain/entities/video_status_update_entity.dart';
 import 'package:textbook_video_learning/features/video_generator/domain/repositories/video_repository.dart';
@@ -34,6 +35,9 @@ class _FakeCreatorRepository implements IVideoRepository {
 
   @override
   Future<List<VideoJobEntity>> getOfflineCachedVideos() async => <VideoJobEntity>[];
+
+  @override
+  Future<List<RecentJobEntity>> getRecentJobs({int limit = 20}) async => <RecentJobEntity>[];
 }
 
 void main() {

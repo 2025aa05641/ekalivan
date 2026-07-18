@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_client.dart';
 import '../../data/datasources/video_remote_data_source.dart';
 import '../../data/repositories/video_repository_impl.dart';
+import '../../domain/entities/recent_job_entity.dart';
 import '../../domain/entities/video_job_entity.dart';
 import '../../domain/entities/video_status_update_entity.dart';
 import '../../domain/repositories/video_repository.dart';
@@ -22,6 +23,12 @@ final Provider<IVideoRepository> videoRepositoryProvider = Provider<IVideoReposi
 /// Owns the async request lifecycle for accepting a new generation job.
 final AsyncNotifierProvider<VideoGenerationNotifier, VideoJobEntity?> videoGenerationProvider =
     AsyncNotifierProvider<VideoGenerationNotifier, VideoJobEntity?>(VideoGenerationNotifier.new);
+
+/// Fetches the list of recent jobs from the server.
+final AutoDisposeFutureProvider<List<RecentJobEntity>> recentJobsProvider =
+    FutureProvider.autoDispose<List<RecentJobEntity>>(
+  (Ref ref) => ref.watch(videoRepositoryProvider).getRecentJobs(),
+);
 
 /// Converts a user action into observed asynchronous generation state.
 class VideoGenerationNotifier extends AsyncNotifier<VideoJobEntity?> {

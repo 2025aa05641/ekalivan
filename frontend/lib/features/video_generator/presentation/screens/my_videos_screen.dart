@@ -21,7 +21,10 @@ class MyVideosScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<List<VideoJobEntity>> cachedVideos = ref.watch(myVideosProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('My Videos')),
+      appBar: AppBar(
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        title: const Text('My Videos'),
+      ),
       body: SafeArea(
         child: cachedVideos.when(
           data: (List<VideoJobEntity> videos) => _CachedVideoList(videos: videos),

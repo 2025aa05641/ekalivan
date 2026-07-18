@@ -1,10 +1,9 @@
-/// Floating, rounded bottom navigation bar per the Ekalivan design system.
+/// Floating, dark navy bottom navigation bar per the Ekalivan design system.
 library;
 
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
-import '../theme/app_theme_extension.dart';
 
 /// One destination in [BottomNav].
 class BottomNavItem {
@@ -18,8 +17,8 @@ class BottomNavItem {
   final String label;
 }
 
-/// Floating white bottom navigation bar with rounded top corners, a blue
-/// active icon, and a gray inactive icon.
+/// Dark navy bottom navigation bar with white active icon/label and
+/// semi-transparent inactive icons — matching the mockup design.
 class BottomNav extends StatelessWidget {
   /// Creates the bottom navigation bar.
   const BottomNav({super.key, required this.items, required this.currentIndex, required this.onTap});
@@ -35,21 +34,23 @@ class BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final EkalivanThemeExtension tokens =
-        Theme.of(context).extension<EkalivanThemeExtension>() ?? EkalivanThemeExtension.standard;
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: tokens.softShadow,
+      decoration: const BoxDecoration(
+        color: AppColors.primaryBlue,
+        boxShadow: [BoxShadow(color: Color(0x33000000), blurRadius: 12, offset: Offset(0, -2))],
       ),
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: <Widget>[
-          for (int i = 0; i < items.length; i++)
-            _BottomNavButton(item: items[i], selected: i == currentIndex, onTap: () => onTap(i)),
-        ],
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 60,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: <Widget>[
+              for (int i = 0; i < items.length; i++)
+                _BottomNavButton(item: items[i], selected: i == currentIndex, onTap: () => onTap(i)),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -64,7 +65,7 @@ class _BottomNavButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color color = selected ? AppColors.primaryBlue : Colors.grey.shade400;
+    final Color color = selected ? Colors.white : const Color(0x80FFFFFF);
     return Semantics(
       button: true,
       selected: selected,
@@ -72,14 +73,22 @@ class _BottomNavButton extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
+        splashColor: Colors.white12,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Icon(item.icon, color: color),
+              Icon(item.icon, color: color, size: 22),
               const SizedBox(height: 2),
-              Text(item.label, style: TextStyle(color: color, fontSize: 11)),
+              Text(
+                item.label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 11,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
             ],
           ),
         ),

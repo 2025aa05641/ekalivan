@@ -1,12 +1,14 @@
 /// Repository implementation combining remote data with local offline caching.
 library;
 
+import '../../domain/entities/recent_job_entity.dart';
 import '../../domain/entities/video_job_entity.dart';
 import '../../domain/entities/video_status_update_entity.dart';
 import '../../domain/repositories/video_repository.dart';
 import '../../domain/value_objects/video_generation_request_params.dart';
 import '../datasources/local_video_cache.dart';
 import '../datasources/video_remote_data_source.dart';
+import '../models/recent_job_model.dart';
 
 const Set<String> _terminalStatuses = <String>{'COMPLETED', 'FAILED'};
 
@@ -36,7 +38,43 @@ class VideoRepositoryImpl implements IVideoRepository {
   Future<List<VideoJobEntity>> getOfflineCachedVideos() => _localCache.getAll();
 
   @override
+  Future<List<RecentJobEntity>> getRecentJobs({int limit = 20}) async {
+    final List<RecentJobModel> models = await _remoteDataSource.getRecentJobs(limit: limit);
+    return models.map((RecentJobModel m) => m.toEntity()).toList();
+  }
+
+  @override
   Stream<VideoStatusUpdateEntity> watchGenerationProgress({required String taskId}) async* {
+    if (taskId.startsWith('mock-')) {
+      final String status = switch (taskId) {
+        'mock-science-6' || 'mock-maths-7' => 'COMPLETED',
+        'mock-tamil-8' => 'PROCESSING',
+        _ => 'QUEUED',
+      };
+      final double progress = switch (taskId) {
+        'mock-science-6' || 'mock-maths-7' => 100.0,
+        'mock-tamil-8' => 50.0,
+        _ => 0.0,
+      };
+      final String currentNode = switch (taskId) {
+        'mock-science-6' || 'mock-maths-7' => 'Final Publish',
+        'mock-tamil-8' => 'Narration (TTS)',
+        _ => 'Lesson Planner',
+      };
+      final String? videoUrl = switch (taskId) {
+        'mock-science-6' => 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+        'mock-maths-7' => 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+        _ => null,
+      };
+      yield VideoStatusUpdateEntity(
+        progress: progress,
+        currentNode: currentNode,
+        status: status,
+        videoUrl: videoUrl,
+      );
+      return;
+    }
+
     int consecutiveFailures = 0;
     while (true) {
       final VideoStatusUpdateEntity? update = await _pollOnce(taskId, onFailure: () => consecutiveFailures++);

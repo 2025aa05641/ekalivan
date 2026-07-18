@@ -22,7 +22,8 @@ def upgrade() -> None:
     op.add_column(
         "video_jobs", sa.Column("file_storage_path", sa.String(length=512), nullable=False, server_default="")
     )
-    op.alter_column("video_jobs", "file_storage_path", server_default=None)
+    if op.get_bind().dialect.name != "sqlite":
+        op.alter_column("video_jobs", "file_storage_path", server_default=None)
     op.add_column("video_jobs", sa.Column("markdown_content", sa.Text(), nullable=True))
     op.add_column("video_jobs", sa.Column("error_message", sa.Text(), nullable=True))
 

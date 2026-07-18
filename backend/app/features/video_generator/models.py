@@ -1,6 +1,13 @@
 """Validated API contracts and shared pipeline state models."""
 
-from enum import StrEnum
+try:
+    from enum import StrEnum
+except ImportError:
+    from enum import Enum
+    class StrEnum(str, Enum):
+        pass
+
+from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -87,6 +94,17 @@ class JobMetrics(BaseModel):
     total_jobs: int = Field(ge=0)
     counts_by_status: dict[str, int]
     average_completion_seconds: float | None = None
+
+
+class RecentJobSummary(BaseModel):
+    """Lightweight summary of a video-generation job for the dashboard list."""
+
+    task_id: UUID
+    status: VideoTaskStatus
+    subject: str
+    chapter_title: str
+    class_level: str
+    created_at: datetime
 
 
 class VideoGenerationState(BaseModel):

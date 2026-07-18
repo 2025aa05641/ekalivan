@@ -4,11 +4,15 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:flutter/foundation.dart';
+
 import '../../../../core/widgets/accessible_error_widget.dart';
 import '../../../../core/widgets/accessible_text.dart';
+import '../../../../core/network/api_client.dart';
 import '../../domain/entities/video_job_entity.dart';
 import '../providers/video_generation_provider.dart';
 import '../widgets/video_player_view.dart';
+import '../widgets/web_video_player.dart';
 
 /// Plays back [job]'s cached video directly, without polling the backend
 /// for status: the job already reached `COMPLETED` when it was cached.
@@ -21,15 +25,19 @@ class CachedVideoScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final String? videoUrl = job.videoUrl;
+    final String? rawUrl = job.videoUrl;
     return Scaffold(
       appBar: AppBar(title: const Text('Your Video')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: videoUrl == null
+          child: rawUrl == null
               ? const AccessibleErrorWidget(message: 'This saved video is no longer available.')
-              : _CachedVideoBody(videoUrl: '${ref.watch(apiClientProvider).baseUrl}$videoUrl'),
+              : _CachedVideoBody(
+                  videoUrl: rawUrl.startsWith('http') 
+                      ? rawUrl 
+                      : '${ref.watch(apiClientProvider).baseUrl}$rawUrl'
+                ),
         ),
       ),
     );
@@ -46,9 +54,13 @@ class _CachedVideoBody extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        AccessibleText('Watch again', style: Theme.of(context).textTheme.headlineLarge),
-        const SizedBox(height: 16),
-        Expanded(child: Center(child: VideoPlayerView(videoUrl: videoUrl))),
+        Expanded(
+          child: Center(
+            child: kIsWeb 
+                ? WebVideoPlayer(videoUrl: videoUrl)
+                : VideoPlayerView(videoUrl: videoUrl),
+          ),
+        ),
       ],
     );
   }

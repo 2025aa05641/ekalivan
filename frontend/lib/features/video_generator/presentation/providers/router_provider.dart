@@ -5,12 +5,17 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../creator_portal/presentation/screens/admin_books_screen.dart';
 import '../../../creator_portal/presentation/screens/admin_dashboard_screen.dart';
+import '../../../creator_portal/presentation/screens/admin_pipelines_screen.dart';
+import '../../../creator_portal/presentation/screens/admin_profile_screen.dart';
+import '../../../creator_portal/presentation/screens/admin_videos_screen.dart';
 import '../../../creator_portal/presentation/screens/login_screen.dart';
 import '../../../creator_portal/presentation/screens/pipeline_complete_screen.dart';
 import '../../../creator_portal/presentation/screens/pipeline_progress_screen.dart';
 import '../../../creator_portal/presentation/screens/rendering_progress_screen.dart';
 import '../../../creator_portal/presentation/screens/upload_book_screen.dart';
+import '../../../role_select/presentation/screens/role_select_screen.dart';
 import '../../../student_portal/presentation/screens/chapter_detail_screen.dart';
 import '../../../student_portal/presentation/screens/chapter_list_screen.dart';
 import '../../../student_portal/presentation/screens/class_selection_screen.dart';
@@ -18,6 +23,9 @@ import '../../../student_portal/presentation/screens/medium_selection_screen.dar
 import '../../../student_portal/presentation/screens/student_splash_screen.dart';
 import '../../../student_portal/presentation/screens/subject_selection_screen.dart';
 import '../../domain/entities/video_job_entity.dart';
+import '../../../student_portal/presentation/screens/student_login_screen.dart';
+import '../../../student_portal/presentation/screens/student_downloads_screen.dart';
+import '../../../student_portal/presentation/screens/student_profile_screen.dart';
 import '../screens/cached_video_screen.dart';
 import '../screens/generation_screen.dart';
 import '../screens/home_screen.dart';
@@ -25,8 +33,11 @@ import '../screens/my_videos_screen.dart';
 
 /// Application routes. Named routes avoid raw route strings in feature widgets.
 enum AppRoute {
-  /// Top-level subject selection route.
-  home('/', 'home'),
+  /// Role-selection screen shown at app startup.
+  roleSelect('/', 'roleSelect'),
+
+  /// Top-level subject/chapter selection route (generator).
+  home('/generate', 'home'),
 
   /// Generation progress and playback route for one accepted job.
   generation('/videos/:taskId', 'generation'),
@@ -46,6 +57,18 @@ enum AppRoute {
   /// Creator portal book upload.
   adminUpload('/admin/upload', 'adminUpload'),
 
+  /// Creator portal book library.
+  adminBooks('/admin/books', 'adminBooks'),
+
+  /// Creator portal pipelines list (all jobs).
+  adminPipelines('/admin/pipelines', 'adminPipelines'),
+
+  /// Creator portal published videos library.
+  adminVideos('/admin/videos', 'adminVideos'),
+
+  /// Creator portal admin profile.
+  adminProfile('/admin/profile', 'adminProfile'),
+
   /// Creator portal 8-step AI pipeline overview for one accepted job.
   adminPipeline('/admin/pipeline/:taskId', 'adminPipeline'),
 
@@ -59,19 +82,28 @@ enum AppRoute {
   studentSplash('/student', 'studentSplash'),
 
   /// Student portal medium selection (English/Tamil).
-  studentMedium('/student/medium', 'studentMedium'),
+  studentMedium('/student/medium', 'student-medium'),
 
   /// Student portal class (grade) selection for a chosen medium.
-  studentClass('/student/:medium/class', 'studentClass'),
+  studentClass('/student/class/:medium', 'student-class'),
 
   /// Student portal subject selection for a chosen medium and grade.
-  studentSubject('/student/:medium/:grade/subject', 'studentSubject'),
+  studentSubject('/student/subject/:medium/:grade', 'student-subject'),
 
   /// Student portal chapter list for a chosen medium, grade, and subject.
-  studentChapters('/student/:medium/:grade/:subject/chapters', 'studentChapters'),
+  studentChapters('/student/chapters/:medium/:grade/:subject', 'student-chapters'),
 
   /// Student portal chapter detail: lesson video and topics.
-  studentChapterDetail('/student/:medium/:grade/:subject/:chapterId', 'studentChapterDetail');
+  studentChapterDetail('/student/chapters/:medium/:grade/:subject/:chapterId', 'student-chapter-detail'),
+
+  /// Student portal login.
+  studentLogin('/student/login', 'student-login'),
+
+  /// Student portal downloads.
+  studentDownloads('/student/downloads', 'student-downloads'),
+
+  /// Student portal profile.
+  studentProfile('/student/profile', 'student-profile');
 
   /// Creates a named application route.
   const AppRoute(this.path, this.routeName);
@@ -86,8 +118,16 @@ enum AppRoute {
 /// Provides the immutable router configuration.
 final Provider<GoRouter> routerProvider = Provider<GoRouter>(
   (Ref ref) => GoRouter(
-    initialLocation: AppRoute.home.path,
+    initialLocation: AppRoute.roleSelect.path,
+    // Redirect any unrecognised or stale URL back to role-select screen
+    // instead of throwing a GoRouter 403 / route-not-found error.
+    errorBuilder: (BuildContext context, GoRouterState state) => const RoleSelectScreen(),
     routes: <RouteBase>[
+      GoRoute(
+        path: AppRoute.roleSelect.path,
+        name: AppRoute.roleSelect.routeName,
+        builder: (BuildContext context, GoRouterState state) => const RoleSelectScreen(),
+      ),
       GoRoute(
         path: AppRoute.home.path,
         name: AppRoute.home.routeName,
@@ -124,6 +164,26 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>(
         path: AppRoute.adminUpload.path,
         name: AppRoute.adminUpload.routeName,
         builder: (BuildContext context, GoRouterState state) => const UploadBookScreen(),
+      ),
+      GoRoute(
+        path: AppRoute.adminBooks.path,
+        name: AppRoute.adminBooks.routeName,
+        builder: (BuildContext context, GoRouterState state) => const AdminBooksScreen(),
+      ),
+      GoRoute(
+        path: AppRoute.adminPipelines.path,
+        name: AppRoute.adminPipelines.routeName,
+        builder: (BuildContext context, GoRouterState state) => const AdminPipelinesScreen(),
+      ),
+      GoRoute(
+        path: AppRoute.adminVideos.path,
+        name: AppRoute.adminVideos.routeName,
+        builder: (BuildContext context, GoRouterState state) => const AdminVideosScreen(),
+      ),
+      GoRoute(
+        path: AppRoute.adminProfile.path,
+        name: AppRoute.adminProfile.routeName,
+        builder: (BuildContext context, GoRouterState state) => const AdminProfileScreen(),
       ),
       GoRoute(
         path: AppRoute.adminPipeline.path,
@@ -185,6 +245,21 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>(
           subject: state.pathParameters['subject']!,
           chapterId: state.pathParameters['chapterId']!,
         ),
+      ),
+      GoRoute(
+        path: AppRoute.studentLogin.path,
+        name: AppRoute.studentLogin.routeName,
+        builder: (BuildContext context, GoRouterState state) => const StudentLoginScreen(),
+      ),
+      GoRoute(
+        path: AppRoute.studentDownloads.path,
+        name: AppRoute.studentDownloads.routeName,
+        builder: (BuildContext context, GoRouterState state) => const StudentDownloadsScreen(),
+      ),
+      GoRoute(
+        path: AppRoute.studentProfile.path,
+        name: AppRoute.studentProfile.routeName,
+        builder: (BuildContext context, GoRouterState state) => const StudentProfileScreen(),
       ),
     ],
   ),

@@ -1,27 +1,26 @@
-/// Sign-in screen for the Creator (Admin) portal.
+/// Sign-in/Sign-up screen for the Student portal.
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_branding.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../../../core/widgets/rounded_input.dart';
 import '../../../video_generator/presentation/providers/router_provider.dart';
+import '../providers/student_auth_provider.dart';
 
-/// First screen of the Creator portal: email/password sign-in.
-///
-/// UI only (Phase 3): "Login" navigates straight to the dashboard without
-/// calling a real authentication backend.
-class LoginScreen extends StatefulWidget {
-  /// Creates the login screen.
-  const LoginScreen({super.key});
+/// The login/signup screen for students.
+class StudentLoginScreen extends ConsumerStatefulWidget {
+  /// Creates the student login screen.
+  const StudentLoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<StudentLoginScreen> createState() => _StudentLoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _StudentLoginScreenState extends ConsumerState<StudentLoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
@@ -32,6 +31,11 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  void _login() {
+    ref.read(isGuestProvider.notifier).state = false;
+    context.goNamed(AppRoute.studentMedium.routeName);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -40,13 +44,13 @@ class _LoginScreenState extends State<LoginScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF0A2952), Color(0xFF0D3B73), Color(0xFF1A5FA8)],
+            colors: [Color(0xFF0A1E3D), Color(0xFF0D3B73), Color(0xFF0A2852)],
           ),
         ),
         child: SafeArea(
           child: Column(
             children: <Widget>[
-              // Back button → role select
+              // Back button to splash
               Align(
                 alignment: Alignment.centerLeft,
                 child: Padding(
@@ -54,7 +58,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: IconButton(
                     icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20),
                     tooltip: 'Back',
-                    onPressed: () => context.goNamed(AppRoute.roleSelect.routeName),
+                    onPressed: () => context.pop(),
                   ),
                 ),
               ),
@@ -67,7 +71,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: <Widget>[
-                          // Logo area
+                          // Logo
                           Center(
                             child: Container(
                               width: 88,
@@ -76,7 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: Colors.white.withValues(alpha: 0.12),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.menu_book_rounded, color: Colors.white, size: 44),
+                              child: const Icon(Icons.school_rounded, color: Colors.white, size: 44),
                             ),
                           ),
                           const SizedBox(height: 20),
@@ -92,43 +96,18 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 6),
                           const Text(
-                            'Admin Portal',
+                            'Student Login',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600),
                           ),
-                          const Text(
-                            'AI Content Creation',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Color(0xAAFFFFFF), fontSize: 13),
-                          ),
                           const SizedBox(height: 36),
-                          // Admin illustration card
-                          Container(
-                            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: <Widget>[
-                                Icon(Icons.computer_rounded, color: Colors.white.withValues(alpha: 0.8), size: 36),
-                                const SizedBox(width: 12),
-                                Icon(Icons.auto_awesome_rounded, color: const Color(0xFFA855F7), size: 24),
-                                const SizedBox(width: 12),
-                                Icon(Icons.bar_chart_rounded, color: Colors.white.withValues(alpha: 0.8), size: 36),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 28),
                           // Email field
                           RoundedInput(
-                            label: 'Email',
+                            label: 'Email / Username',
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
                             darkBackground: true,
-                            prefixIcon: Icons.email_outlined,
+                            prefixIcon: Icons.person_outline_rounded,
                           ),
                           const SizedBox(height: 14),
                           // Password field
@@ -141,16 +120,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 24),
                           PrimaryButton(
-                            label: 'Login',
-                            onPressed: () => context.goNamed(AppRoute.adminDashboard.routeName),
-                          ),
-                          const SizedBox(height: 16),
-                          TextButton(
-                            onPressed: () {},
-                            child: const Text(
-                              'Forgot Password?',
-                              style: TextStyle(color: Color(0xAAFFFFFF), fontSize: 14),
-                            ),
+                            label: 'Login / Sign Up',
+                            onPressed: _login,
                           ),
                         ],
                       ),

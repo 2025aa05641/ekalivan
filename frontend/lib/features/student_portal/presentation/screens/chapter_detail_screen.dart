@@ -23,11 +23,11 @@ class _Topic {
 }
 
 const List<_Topic> _placeholderTopics = <_Topic>[
-  _Topic(title: 'Plants in Our Surroundings', unlocked: true),
-  _Topic(title: 'Parts of a Plant', unlocked: true),
-  _Topic(title: 'Photosynthesis', unlocked: true),
-  _Topic(title: 'Transpiration', unlocked: false),
-  _Topic(title: 'Summary', unlocked: false),
+  _Topic(title: '1. Plants in Our Surroundings', unlocked: true),
+  _Topic(title: '2. Parts of a Plant', unlocked: true),
+  _Topic(title: '3. Photosynthesis', unlocked: true),
+  _Topic(title: '4. Transpiration', unlocked: false),
+  _Topic(title: '5. Summary', unlocked: false),
 ];
 
 /// Chapter titles keyed by id, matching `ChapterListScreen`'s Science set.
@@ -40,12 +40,6 @@ const Map<String, String> _chapterSubtitles = <String, String>{
 };
 
 /// Shows one chapter's lesson video and its topic breakdown.
-///
-/// Only Grade 6 Science Chapter 1 ("The World of Plants") is backed by the
-/// real pipeline, for either medium (see the roadmap's Scope section — the
-/// backend has no per-language narration yet, so both mediums currently
-/// produce the same English-narrated video). Every other chapter stays a
-/// placeholder.
 class ChapterDetailScreen extends ConsumerWidget {
   /// Creates the chapter detail screen for [chapterId].
   const ChapterDetailScreen({
@@ -100,37 +94,100 @@ class ChapterDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final String chapterSubtitle = _chapterSubtitles[chapterId] ?? 'Chapter $chapterId';
     return AppScaffold(
-      appBar: AppBar(title: Text('Chapter $chapterId')),
+      appBar: AppBar(
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        title: Text('Chapter $chapterId'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(22),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              chapterSubtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ),
+        ),
+      ),
       bottomNavigationBar: const StudentBottomNav(current: StudentNavDestination.home),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),
         children: <Widget>[
-          Text(chapterSubtitle, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: AppSpacing.md),
+          // Video player card
           VideoCard(
             title: chapterSubtitle,
-            duration: '08:42',
+            duration: '06:42',
             onTap: _isRealChapter
                 ? () => _watchRealLesson(context, ref)
                 : () => ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(const SnackBar(content: Text('This lesson is being prepared.'))),
+                      context,
+                    ).showSnackBar(const SnackBar(content: Text('This lesson is being prepared.'))),
           ),
           const SizedBox(height: AppSpacing.lg),
-          Text('Topics in this Chapter', style: Theme.of(context).textTheme.titleMedium),
+          Text(
+            'Topics in this Chapter',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
           const SizedBox(height: AppSpacing.sm),
-          for (final _Topic topic in _placeholderTopics)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(
-                topic.unlocked ? Icons.check_circle_rounded : Icons.lock_rounded,
-                color: topic.unlocked ? AppColors.success : Colors.grey,
-              ),
-              title: Text(
-                topic.title,
-                style: TextStyle(color: topic.unlocked ? null : Colors.grey, fontWeight: FontWeight.w500),
-              ),
+          // Topics list
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: const [BoxShadow(color: Color(0x0A000000), blurRadius: 6, offset: Offset(0, 2))],
             ),
+            child: Column(
+              children: <Widget>[
+                for (int i = 0; i < _placeholderTopics.length; i++) ...<Widget>[
+                  _TopicTile(topic: _placeholderTopics[i]),
+                  if (i < _placeholderTopics.length - 1)
+                    const Divider(height: 1, indent: 56, endIndent: 16, color: AppColors.border),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TopicTile extends StatelessWidget {
+  const _TopicTile({required this.topic});
+
+  final _Topic topic;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: topic.unlocked
+                  ? AppColors.success.withValues(alpha: 0.12)
+                  : Colors.grey.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              topic.unlocked ? Icons.check_rounded : Icons.lock_outline_rounded,
+              color: topic.unlocked ? AppColors.success : Colors.grey,
+              size: 16,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            topic.title,
+            style: TextStyle(
+              color: topic.unlocked ? const Color(0xFF0F172A) : Colors.grey,
+              fontWeight: topic.unlocked ? FontWeight.w600 : FontWeight.w400,
+              fontSize: 14,
+            ),
+          ),
         ],
       ),
     );

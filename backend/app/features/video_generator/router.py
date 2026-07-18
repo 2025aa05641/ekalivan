@@ -16,6 +16,7 @@ from app.features.video_generator.models import (
     JobMetrics,
     JobStatusResponse,
     NarratedBeat,
+    RecentJobSummary,
     ScriptBeat,
     VideoGenerationRequest,
     VideoGenerationResponse,
@@ -144,6 +145,34 @@ async def get_video_metrics(service: VideoGenerationService = Depends(get_video_
         Total job count, per-status counts, and mean completion time.
     """
     return await service.get_metrics()
+
+
+@router.get("/", response_model=list[RecentJobSummary])
+async def list_video_jobs(
+    service: VideoGenerationService = Depends(get_video_service),
+    limit: int = 20,
+) -> list[RecentJobSummary]:
+    """Return the most recently created video jobs for dashboard display.
+
+    Args:
+        service: Injected job service.
+        limit: Maximum number of jobs to return (default 20).
+
+    Returns:
+        List of lightweight job summaries ordered newest-first.
+    """
+    jobs = await service.list_jobs(limit=limit)
+    return [
+        RecentJobSummary(
+            task_id=job.id,
+            status=VideoTaskStatus(job.status),
+            subject=job.subject,
+            chapter_title=job.chapter_title,
+            class_level=job.class_level,
+            created_at=job.created_at,
+        )
+        for job in jobs
+    ]
 
 
 @router.get("/{task_id}", response_model=JobStatusResponse)
