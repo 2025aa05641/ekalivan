@@ -88,6 +88,20 @@ class JobStatusResponseModel {
     // Use actual field presence to compute real progress.
     if (status == 'COMPLETED') return 100;
     if (status == 'FAILED') return 0;
+    // Mirror the named nodes sent by the backend LangGraph pipeline. These
+    // values are authoritative while a job is processing.
+    final double? nodeProgress = switch (progressNode) {
+      'Textbook Parsing' => 5,
+      'Curriculum Mapping' => 18,
+      'Lesson Planning' => 31,
+      'Teacher Script' => 44,
+      'Storyboard' => 57,
+      'Narration (TTS)' => 70,
+      'Video Rendering' => 83,
+      'Publishing' => 94,
+      _ => null,
+    };
+    if (nodeProgress != null) return nodeProgress;
     if (videoUrl != null) return 100;
     if (narratedBeats != null && narratedBeats!.isNotEmpty) return 62; // step 5 – video rendering
     if (storyboardBeats != null && storyboardBeats!.isNotEmpty) return 50; // step 4 – narration

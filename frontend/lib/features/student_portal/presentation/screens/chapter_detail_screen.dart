@@ -70,7 +70,12 @@ class ChapterDetailScreen extends ConsumerWidget {
     // 1. Check local offline cache first.
     final List<VideoJobEntity> cached = await ref.read(videoRepositoryProvider).getOfflineCachedVideos();
     if (!context.mounted) return;
-    final VideoJobEntity? cachedLesson = cached.where((VideoJobEntity job) => job.taskId == chapterId).firstOrNull;
+    VideoJobEntity? cachedLesson;
+    try {
+      cachedLesson = cached.firstWhere((VideoJobEntity job) => job.taskId == chapterId);
+    } catch (_) {
+      cachedLesson = null;
+    }
     if (cachedLesson != null) {
       context.pushNamed(AppRoute.cachedVideo.routeName, extra: cachedLesson);
       return;

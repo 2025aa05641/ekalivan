@@ -191,6 +191,13 @@ class _PipelineStepList extends StatelessWidget {
   }
 
   void _handleTap(BuildContext context, int stageIndex, int completedSteps) {
+    if (update.status == 'COMPLETED') {
+      context.goNamed(
+        AppRoute.adminComplete.routeName,
+        pathParameters: <String, String>{'taskId': taskId},
+      );
+      return;
+    }
     // Completed stages → show detail sheet
     if (update.status == 'COMPLETED' || stageIndex < completedSteps) {
       _showStageDetail(context, stageIndex);
@@ -203,10 +210,6 @@ class _PipelineStepList extends StatelessWidget {
         pathParameters: <String, String>{'taskId': taskId},
       );
       return;
-    }
-    // Fully completed job
-    if (update.status == 'COMPLETED') {
-      context.goNamed(AppRoute.adminComplete.routeName, pathParameters: <String, String>{'taskId': taskId});
     }
   }
 
@@ -442,6 +445,8 @@ class _StageDetailSheet extends StatelessWidget {
 
       // Stage 1: Teacher — show structured sections
       case 1:
+      case 2:
+      case 3:
         final List<Map<String, Object?>>? secs = update.sections;
         if (secs == null || secs.isEmpty) return <Widget>[_emptyCard('No sections available.')];
         return <Widget>[
@@ -450,7 +455,7 @@ class _StageDetailSheet extends StatelessWidget {
         ];
 
       // Stage 2: Storyboard — show visual beats
-      case 2:
+      case 4:
         final List<Map<String, Object?>>? beats = update.storyboardBeats;
         if (beats == null || beats.isEmpty) return <Widget>[_emptyCard('No storyboard beats available.')];
         return <Widget>[
@@ -459,7 +464,7 @@ class _StageDetailSheet extends StatelessWidget {
         ];
 
       // Stage 3: Narration (TTS) — show narrated beats with timing
-      case 3:
+      case 5:
         final List<Map<String, Object?>>? beats = update.narratedBeats;
         if (beats == null || beats.isEmpty) return <Widget>[_emptyCard('No narrated beats available.')];
         return <Widget>[
