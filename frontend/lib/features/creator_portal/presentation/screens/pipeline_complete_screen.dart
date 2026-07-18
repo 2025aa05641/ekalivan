@@ -152,9 +152,11 @@ class _CompleteBodyState extends ConsumerState<_CompleteBody> {
       );
     }
 
+    final String baseUrl = ref.read(apiClientProvider).baseUrl.replaceAll(RegExp(r'/$'), '');
+    final String safeRawUrl = rawUrl.replaceFirst(RegExp(r'^/'), '');
     final String videoUrl = rawUrl.startsWith('http')
         ? rawUrl
-        : '${ref.read(apiClientProvider).baseUrl}$rawUrl';
+        : '$baseUrl/$safeRawUrl';
 
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.md),

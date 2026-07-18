@@ -102,9 +102,11 @@ class StudentVideoPlayerScreen extends ConsumerWidget {
             }
 
             final String rawUrl = update.videoUrl!;
+            final String baseUrl = ref.read(apiClientProvider).baseUrl.replaceAll(RegExp(r'/$'), '');
+            final String safeRawUrl = rawUrl.replaceFirst(RegExp(r'^/'), '');
             final String videoUrl = rawUrl.startsWith('http')
                 ? rawUrl
-                : '${ref.read(apiClientProvider).baseUrl}$rawUrl';
+                : '$baseUrl/$safeRawUrl';
 
             return _StudentVideoBody(videoUrl: videoUrl, taskId: taskId);
           },
