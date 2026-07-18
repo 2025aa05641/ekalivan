@@ -36,6 +36,14 @@ class ApiClient {
     return _send(() => _dio.post<Map<String, Object?>>(path, data: data));
   }
 
+  /// Sends a multipart form-data request to upload a file and returns the decoded object response.
+  Future<Map<String, Object?>> uploadFile(String path, {required List<int> bytes, required String filename}) async {
+    final FormData formData = FormData.fromMap(<String, Object>{
+      'file': MultipartFile.fromBytes(bytes, filename: filename),
+    });
+    return _send(() => _dio.post<Map<String, Object?>>(path, data: formData));
+  }
+
   /// Sends a GET request and returns the decoded object response.
   ///
   /// Explicitly disables caching: this is used for status polling, where a

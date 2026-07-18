@@ -5,6 +5,9 @@ import '../value_objects/video_generation_request_params.dart';
 
 /// Keeps API and persistence details outside domain and presentation layers.
 abstract interface class IVideoRepository {
+  /// Uploads a file to the backend and returns the server-side storage path.
+  Future<String> uploadVideoSource({required List<int> bytes, required String filename});
+
   /// Requests creation of a new video job.
   Future<VideoJobEntity> requestVideoGeneration({required VideoGenerationRequestParams params});
 

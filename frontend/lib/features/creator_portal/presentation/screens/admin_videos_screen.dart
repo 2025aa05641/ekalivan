@@ -9,19 +9,55 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/app_scaffold.dart';
 import '../../../../core/widgets/notification_bell.dart';
+import '../../../video_generator/domain/entities/recent_job_entity.dart';
 import '../../../video_generator/domain/entities/video_job_entity.dart';
 import '../../../video_generator/presentation/providers/router_provider.dart';
 import '../../../video_generator/presentation/providers/video_generation_provider.dart';
 import '../widgets/admin_bottom_nav.dart';
 
-/// Displays the library of videos published via the pipeline-complete screen.
+/// Displays the library of videos published via the pipeline-complete screen
+/// as well as any COMPLETED jobs in the backend (merged and de-duplicated).
 class AdminVideosScreen extends ConsumerWidget {
   /// Creates the admin videos screen.
   const AdminVideosScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<List<VideoJobEntity>> videosAsync = ref.watch(myVideosProvider);
+    final AsyncValue<List<VideoJobEntity>> cachedAsync = ref.watch(myVideosProvider);
+    final AsyncValue<List<RecentJobEntity>> recentAsync = ref.watch(recentJobsProvider);
+
+    // Merge local cache with backend COMPLETED jobs.
+    // Show loading only if both are still loading; prefer to show partial data.
+    final bool isLoading = cachedAsync.isLoading && recentAsync.isLoading;
+    if (isLoading) {
+      return AppScaffold(
+        appBar: AppBar(
+          title: const Text('Published Videos'),
+          automaticallyImplyLeading: false,
+          actions: const <Widget>[NotificationBell()],
+        ),
+        bottomNavigationBar: const AdminBottomNav(current: AdminNavDestination.videos),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Build a combined list. Local-cache entries take priority (they have a real videoUrl).
+    final Map<String, VideoJobEntity> videoMap = <String, VideoJobEntity>{};
+    for (final VideoJobEntity v in cachedAsync.valueOrNull ?? <VideoJobEntity>[]) {
+      videoMap[v.taskId] = v;
+    }
+    // Supplement with backend COMPLETED jobs not yet in local cache.
+    for (final RecentJobEntity j in recentAsync.valueOrNull ?? <RecentJobEntity>[]) {
+      if (j.status == 'COMPLETED' && !videoMap.containsKey(j.taskId)) {
+        videoMap[j.taskId] = VideoJobEntity(
+          taskId: j.taskId,
+          status: j.status,
+          // videoUrl will be resolved when navigating to the complete screen.
+          videoUrl: null,
+        );
+      }
+    }
+    final List<VideoJobEntity> allVideos = videoMap.values.toList();
 
     return AppScaffold(
       appBar: AppBar(
@@ -30,70 +66,51 @@ class AdminVideosScreen extends ConsumerWidget {
         actions: const <Widget>[NotificationBell()],
       ),
       bottomNavigationBar: const AdminBottomNav(current: AdminNavDestination.videos),
-      body: videosAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (Object e, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+      body: allVideos.isEmpty
+          ? _EmptyState()
+          : ListView(
+              padding: const EdgeInsets.all(AppSpacing.md),
               children: <Widget>[
-                Icon(Icons.error_outline_rounded, size: 48, color: AppColors.danger.withValues(alpha: 0.5)),
-                const SizedBox(height: 12),
-                Text('Failed to load videos: $e', textAlign: TextAlign.center),
+                // Header stats
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF7E3FF2), Color(0xFFA855F7)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      const Icon(Icons.video_library_rounded, color: Colors.white, size: 28),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            '${allVideos.length} Video${allVideos.length == 1 ? '' : 's'}',
+                            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+                          ),
+                          const Text(
+                            'published for students',
+                            style: TextStyle(color: Colors.white70, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text('All Published Videos', style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: AppSpacing.sm),
+                for (final VideoJobEntity video in allVideos) ...<Widget>[
+                  _VideoCard(video: video),
+                  const SizedBox(height: AppSpacing.sm),
+                ],
               ],
             ),
-          ),
-        ),
-        data: (List<VideoJobEntity> videos) {
-          if (videos.isEmpty) {
-            return _EmptyState();
-          }
-          return ListView(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            children: <Widget>[
-              // Header stats
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF7E3FF2), Color(0xFFA855F7)],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Row(
-                  children: <Widget>[
-                    const Icon(Icons.video_library_rounded, color: Colors.white, size: 28),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          '${videos.length} Video${videos.length == 1 ? '' : 's'}',
-                          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
-                        ),
-                        const Text(
-                          'published for students',
-                          style: TextStyle(color: Colors.white70, fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Text('All Published Videos', style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: AppSpacing.sm),
-              for (final VideoJobEntity video in videos) ...<Widget>[
-                _VideoCard(video: video),
-                const SizedBox(height: AppSpacing.sm),
-              ],
-            ],
-          );
-        },
-      ),
     );
   }
 }

@@ -30,6 +30,11 @@ class VideoRepositoryImpl implements IVideoRepository {
   final LocalVideoCache _localCache;
 
   @override
+  Future<String> uploadVideoSource({required List<int> bytes, required String filename}) async {
+    return _remoteDataSource.uploadFile(bytes: bytes, filename: filename);
+  }
+
+  @override
   Future<VideoJobEntity> requestVideoGeneration({required VideoGenerationRequestParams params}) async {
     return (await _remoteDataSource.requestGeneration(params)).toEntity();
   }

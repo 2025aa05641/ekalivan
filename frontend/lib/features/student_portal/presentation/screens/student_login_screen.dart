@@ -33,7 +33,7 @@ class _StudentLoginScreenState extends ConsumerState<StudentLoginScreen> {
 
   void _login() {
     ref.read(isGuestProvider.notifier).state = false;
-    context.goNamed(AppRoute.studentMedium.routeName);
+    context.pushNamed(AppRoute.studentMedium.routeName);
   }
 
   @override

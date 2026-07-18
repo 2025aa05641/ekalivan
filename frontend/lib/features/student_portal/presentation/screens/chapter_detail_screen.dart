@@ -5,11 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/constants/demo_chapter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/app_scaffold.dart';
 import '../../../../core/widgets/video_card.dart';
+import '../../../video_generator/domain/entities/recent_job_entity.dart';
 import '../../../video_generator/domain/entities/video_job_entity.dart';
 import '../../../video_generator/presentation/providers/router_provider.dart';
 import '../../../video_generator/presentation/providers/video_generation_provider.dart';
@@ -62,32 +62,54 @@ class ChapterDetailScreen extends ConsumerWidget {
   /// Chapter id chosen on the previous screen.
   final String chapterId;
 
-  bool get _isRealChapter =>
-      (medium == 'english' || medium == 'tamil') && grade == '6' && subject == 'science' && chapterId == '1';
-
-  Future<void> _watchRealLesson(BuildContext context, WidgetRef ref) async {
+  /// Navigates the student to the best available video source:
+  /// 1. A locally cached offline video (fastest).
+  /// 2. Any COMPLETED job from the backend for any chapter (stream).
+  /// 3. Falls back to requesting a new generation via the demo chapter.
+  Future<void> _watchLesson(BuildContext context, WidgetRef ref) async {
+    // 1. Check local offline cache first.
     final List<VideoJobEntity> cached = await ref.read(videoRepositoryProvider).getOfflineCachedVideos();
-    if (!context.mounted) {
-      return;
-    }
+    if (!context.mounted) return;
     if (cached.isNotEmpty) {
       context.pushNamed(AppRoute.cachedVideo.routeName, extra: cached.first);
       return;
     }
 
-    await ref.read(videoGenerationProvider.notifier).request(demoChapter);
-    if (!context.mounted) {
+    // 2. Check backend for any COMPLETED job we can stream.
+    final List<RecentJobEntity> recentJobs = await ref.read(videoRepositoryProvider).getRecentJobs();
+    if (!context.mounted) return;
+    // Find the best matching job: prefer same subject/grade, then any completed job.
+    RecentJobEntity? matchingJob;
+    try {
+      matchingJob = recentJobs.firstWhere(
+        (RecentJobEntity j) =>
+            j.status == 'COMPLETED' &&
+            j.classLevel == grade &&
+            j.subject.toLowerCase() == subject.toLowerCase(),
+      );
+    } catch (_) {
+      // No exact match — try any completed job.
+      try {
+        matchingJob = recentJobs.firstWhere((RecentJobEntity j) => j.status == 'COMPLETED');
+      } catch (_) {
+        matchingJob = null;
+      }
+    }
+    if (matchingJob != null) {
+      context.pushNamed(
+        AppRoute.adminComplete.routeName,
+        pathParameters: <String, String>{'taskId': matchingJob.taskId},
+      );
       return;
     }
-    final AsyncValue<VideoJobEntity?> state = ref.read(videoGenerationProvider);
-    final VideoJobEntity? job = state.valueOrNull;
-    if (job != null) {
-      context.pushNamed(AppRoute.generation.routeName, pathParameters: <String, String>{'taskId': job.taskId});
-      return;
-    }
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(state.error?.toString() ?? 'Unable to start generation.')));
+
+    // 3. No video available — show informative snackbar.
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('No video is available yet for this chapter. Please check back soon!'),
+        duration: Duration(seconds: 3),
+      ),
+    );
   }
 
   @override
@@ -114,15 +136,11 @@ class ChapterDetailScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),
         children: <Widget>[
-          // Video player card
+          // Video player card — any chapter can now attempt to load a real video.
           VideoCard(
             title: chapterSubtitle,
             duration: '06:42',
-            onTap: _isRealChapter
-                ? () => _watchRealLesson(context, ref)
-                : () => ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(const SnackBar(content: Text('This lesson is being prepared.'))),
+            onTap: () => _watchLesson(context, ref),
           ),
           const SizedBox(height: AppSpacing.lg),
           Text(

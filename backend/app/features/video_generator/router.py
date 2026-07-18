@@ -2,10 +2,13 @@
 
 import asyncio
 import logging
+import uuid
+import shutil
 from collections.abc import Coroutine
+from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Request, status, UploadFile, File, HTTPException
 from langgraph.graph.state import CompiledStateGraph
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -132,6 +135,39 @@ async def generate_video(
         ),
     )
     return VideoGenerationResponse(task_id=job.id, status=VideoTaskStatus(job.status))
+
+
+@router.post("/upload", status_code=status.HTTP_201_CREATED)
+async def upload_video_source(
+    request: Request,
+    file: UploadFile = File(...),
+) -> dict[str, str]:
+    """Accept a PDF file and save it to the static assets directory.
+
+    Args:
+        request: Current FastAPI request (for app state).
+        file: Uploaded file via multipart/form-data.
+
+    Returns:
+        The server-side path where the file was saved.
+    """
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file uploaded.")
+
+    from app.core.config import get_settings as _get_settings
+
+    _settings = _get_settings()
+    uploads_dir = Path(_settings.static_assets_path) / "uploads"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+
+    file_ext = Path(file.filename).suffix
+    new_filename = f"{uuid.uuid4()}{file_ext}"
+    file_path = uploads_dir / new_filename
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    return {"file_storage_path": str(file_path).replace("\\", "/")}
 
 
 @router.get("/metrics", response_model=JobMetrics)

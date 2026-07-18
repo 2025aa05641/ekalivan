@@ -4,13 +4,14 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:file_picker/file_picker.dart';
 
-import '../../../../core/constants/demo_chapter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/app_scaffold.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../../video_generator/domain/entities/video_job_entity.dart';
+import '../../../video_generator/domain/value_objects/video_generation_request_params.dart';
 import '../../../video_generator/presentation/providers/router_provider.dart';
 import '../../../video_generator/presentation/providers/video_generation_provider.dart';
 
@@ -24,14 +25,54 @@ class UploadBookScreen extends ConsumerStatefulWidget {
 }
 
 class _UploadBookScreenState extends ConsumerState<UploadBookScreen> {
-  String? _selectedFileName = 'Science_6th_Standard.pdf';
+  PlatformFile? _selectedFile;
   String _medium = 'English';
   String _grade = 'Grade 6';
+  String _subject = 'Science';
+  final TextEditingController _chapterTitleController = TextEditingController(
+    text: 'Chapter 1',
+  );
   bool _isSubmitting = false;
 
+  @override
+  void dispose() {
+    _chapterTitleController.dispose();
+    super.dispose();
+  }
+
+  /// Extracts the numeric grade from the display string (e.g. "Grade 6" → "6").
+  String get _gradeNumber => _grade.replaceAll(RegExp(r'[^0-9]'), '');
+
   Future<void> _uploadAndProcess() async {
+    if (_selectedFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a PDF file first.')));
+      return;
+    }
+    final String chapterTitle = _chapterTitleController.text.trim();
+    if (chapterTitle.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a chapter title.')),
+      );
+      return;
+    }
     setState(() => _isSubmitting = true);
-    await ref.read(videoGenerationProvider.notifier).request(demoChapter);
+    
+    try {
+      // 1. Upload file to backend
+      final String fileStoragePath = await ref.read(videoRepositoryProvider).uploadVideoSource(
+        bytes: _selectedFile!.bytes!,
+        filename: _selectedFile!.name,
+      );
+
+      // 2. Request Generation
+      final VideoGenerationRequestParams params = VideoGenerationRequestParams(
+        classLevel: _gradeNumber,
+        subject: _subject,
+        chapterTitle: chapterTitle,
+        fileStoragePath: fileStoragePath,
+      );
+
+    await ref.read(videoGenerationProvider.notifier).request(params);
     if (!mounted) {
       return;
     }
@@ -45,13 +86,28 @@ class _UploadBookScreenState extends ConsumerState<UploadBookScreen> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(state.error?.toString() ?? 'Unable to start generation.')));
+    
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
       appBar: AppBar(
-        leading: BackButton(onPressed: () => context.goNamed(AppRoute.adminDashboard.routeName)),
+        // Use pop() so this works whether reached via pushNamed or goNamed.
+        leading: BackButton(
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.goNamed(AppRoute.adminDashboard.routeName);
+            }
+          },
+        ),
         title: const Text('Upload New Book'),
       ),
       body: ListView(
@@ -59,11 +115,20 @@ class _UploadBookScreenState extends ConsumerState<UploadBookScreen> {
         children: <Widget>[
           // Drop zone
           _DottedDropZone(
-            hasFile: _selectedFileName != null,
-            onChooseFile: () => setState(() => _selectedFileName = 'Science_6th_Standard.pdf'),
+            hasFile: _selectedFile != null,
+            onChooseFile: () async {
+              final result = await FilePicker.pickFiles(
+                type: FileType.custom,
+                allowedExtensions: ['pdf'],
+                withData: true,
+              );
+              if (result != null && result.files.isNotEmpty) {
+                setState(() => _selectedFile = result.files.first);
+              }
+            },
           ),
           // Selected file row
-          if (_selectedFileName != null) ...<Widget>[
+          if (_selectedFile != null) ...<Widget>[
             const SizedBox(height: AppSpacing.md),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -89,15 +154,20 @@ class _UploadBookScreenState extends ConsumerState<UploadBookScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         Text(
-                          _selectedFileName!,
+                          _selectedFile!.name,
                           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                         ),
-                        const Text('12.4 MB', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                        Text(
+                          _selectedFile!.size < 1024 * 1024 
+                              ? '${(_selectedFile!.size / 1024).toStringAsFixed(1)} KB'
+                              : '${(_selectedFile!.size / (1024 * 1024)).toStringAsFixed(1)} MB',
+                          style: const TextStyle(color: Colors.grey, fontSize: 12),
+                        ),
                       ],
                     ),
                   ),
                   IconButton(
-                    onPressed: () => setState(() => _selectedFileName = null),
+                    onPressed: () => setState(() => _selectedFile = null),
                     icon: const Icon(Icons.close_rounded, size: 18),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
@@ -109,20 +179,62 @@ class _UploadBookScreenState extends ConsumerState<UploadBookScreen> {
           const SizedBox(height: AppSpacing.lg),
           Text('Select Medium', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: AppSpacing.sm),
-          _Dropdown(value: _medium, options: const <String>['English', 'Tamil'], onChanged: (String v) => setState(() => _medium = v)),
+          _Dropdown(
+            value: _medium,
+            options: const <String>['English', 'Tamil'],
+            onChanged: (String v) => setState(() => _medium = v),
+          ),
           const SizedBox(height: AppSpacing.md),
           Text('Select Class', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: AppSpacing.sm),
           _Dropdown(
             value: _grade,
-            options: const <String>['Grade 6', 'Grade 7', 'Grade 8'],
+            options: const <String>[
+              'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5',
+              'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10',
+              'Grade 11', 'Grade 12',
+            ],
             onChanged: (String v) => setState(() => _grade = v),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text('Select Subject', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: AppSpacing.sm),
+          _Dropdown(
+            value: _subject,
+            options: const <String>[
+              'Science', 'Mathematics', 'English', 'Tamil', 'Social Science',
+            ],
+            onChanged: (String v) => setState(() => _subject = v),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text('Chapter Title', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: AppSpacing.sm),
+          TextFormField(
+            controller: _chapterTitleController,
+            decoration: InputDecoration(
+              hintText: 'e.g. The World of Plants',
+              filled: true,
+              fillColor: AppColors.card,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.primaryBlue, width: 1.5),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
           ),
           const SizedBox(height: AppSpacing.lg),
           PrimaryButton(
             label: 'Upload & Process',
             loading: _isSubmitting,
-            onPressed: _selectedFileName == null || _isSubmitting ? null : _uploadAndProcess,
+            onPressed: _selectedFile == null || _isSubmitting ? null : _uploadAndProcess,
           ),
         ],
       ),

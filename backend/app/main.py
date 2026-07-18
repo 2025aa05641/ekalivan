@@ -127,11 +127,11 @@ def create_app(
     app.state.background_tasks = set()
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
+        allow_origins=["*"],
         allow_credentials=False,
-        allow_methods=["GET", "POST"],
-        allow_headers=["Content-Type", "Cache-Control", "Range"],
-        expose_headers=["Content-Range", "Accept-Ranges", "Content-Length"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["*"],
         max_age=3600,
     )
     register_exception_handlers(app)

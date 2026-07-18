@@ -145,7 +145,9 @@ class AdminDashboardScreen extends ConsumerWidget {
           const SizedBox(height: AppSpacing.lg),
           PrimaryButton(
             label: '+ Upload New Book',
-            onPressed: () => context.goNamed(AppRoute.adminUpload.routeName),
+            // pushNamed keeps Dashboard in the back-stack so the Upload
+            // screen's back button returns here without clearing history.
+            onPressed: () => context.pushNamed(AppRoute.adminUpload.routeName),
           ),
         ],
       ),

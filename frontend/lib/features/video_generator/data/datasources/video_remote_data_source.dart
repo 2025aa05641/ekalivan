@@ -14,6 +14,12 @@ class VideoRemoteDataSource {
 
   final ApiClient _apiClient;
 
+  /// Uploads a file to the backend using multipart form-data.
+  Future<String> uploadFile({required List<int> bytes, required String filename}) async {
+    final Map<String, Object?> response = await _apiClient.uploadFile('/api/v1/videos/upload', bytes: bytes, filename: filename);
+    return response['file_storage_path'] as String;
+  }
+
   /// Calls the accepted-job endpoint.
   Future<VideoGenerationResponseModel> requestGeneration(VideoGenerationRequestParams params) async {
     final Map<String, Object?> response = await _apiClient.post(
