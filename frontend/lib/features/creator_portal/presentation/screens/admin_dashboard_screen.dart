@@ -101,7 +101,14 @@ class AdminDashboardScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Admin Dashboard'),
         automaticallyImplyLeading: false,
-        actions: const <Widget>[NotificationBell()],
+        actions: <Widget>[
+          IconButton(
+            icon: const Icon(Icons.people_alt_outlined),
+            tooltip: 'Switch Role',
+            onPressed: () => context.goNamed(AppRoute.roleSelect.routeName),
+          ),
+          const NotificationBell(),
+        ],
       ),
       bottomNavigationBar: const AdminBottomNav(current: AdminNavDestination.dashboard),
       body: ListView(

@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/accessible_error_widget.dart';
+import '../../../../core/widgets/app_scaffold.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../../../core/widgets/secondary_button.dart';
 import '../../../video_generator/data/datasources/local_video_cache.dart';
@@ -40,20 +41,18 @@ class PipelineCompleteScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<VideoStatusUpdateEntity> statusAsync =
         ref.watch(_jobStatusOnceProvider(taskId));
-    return Scaffold(
-      backgroundColor: AppColors.background,
+    return AppScaffold(
       appBar: AppBar(
         leading: BackButton(
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.goNamed(AppRoute.adminDashboard.routeName);
-            }
-          },
+          onPressed: () => context.goNamed(AppRoute.adminDashboard.routeName),
         ),
-        title: const Text('Pipeline Completed!'),
+        title: const Text('Pipeline Complete'),
         actions: <Widget>[
+          IconButton(
+            icon: const Icon(Icons.people_alt_outlined),
+            tooltip: 'Switch Role',
+            onPressed: () => context.goNamed(AppRoute.roleSelect.routeName),
+          ),
           IconButton(
             icon: const Icon(Icons.home_rounded),
             tooltip: 'Admin Home',

@@ -54,6 +54,11 @@ class RenderingProgressScreen extends ConsumerWidget {
         title: const Text('Pipeline - Step 7'),
         actions: <Widget>[
           IconButton(
+            icon: const Icon(Icons.people_alt_outlined),
+            tooltip: 'Switch Role',
+            onPressed: () => context.goNamed(AppRoute.roleSelect.routeName),
+          ),
+          IconButton(
             icon: const Icon(Icons.home_rounded),
             tooltip: 'Admin Home',
             onPressed: () =>
