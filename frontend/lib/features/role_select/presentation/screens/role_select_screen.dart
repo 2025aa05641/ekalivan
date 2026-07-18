@@ -28,15 +28,17 @@ class RoleSelectScreen extends StatelessWidget {
           ),
         ),
         child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              physics: const NeverScrollableScrollPhysics(),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 400, minWidth: 300),
-                  child: Column(
+          child: LayoutBuilder(
+            builder: (BuildContext context, BoxConstraints viewport) => SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: (viewport.maxHeight - 64).clamp(0.0, double.infinity).toDouble(),
+                ),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 400),
+                    child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
@@ -120,6 +122,8 @@ class RoleSelectScreen extends StatelessWidget {
                       ),
                     ),
                   ],
+                    ),
+                  ),
                 ),
               ),
             ),

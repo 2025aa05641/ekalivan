@@ -79,6 +79,7 @@ class JobStatusResponse(BaseModel):
 
     task_id: UUID
     status: VideoTaskStatus
+    progress_node: str | None = None
     markdown_content: str | None = None
     sections: list[ChapterSection] | None = None
     storyboard_beats: list[ScriptBeat] | None = None

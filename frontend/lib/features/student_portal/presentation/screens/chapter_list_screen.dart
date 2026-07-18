@@ -2,12 +2,14 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/app_scaffold.dart';
 import '../../../video_generator/presentation/providers/router_provider.dart';
+import '../../../video_generator/presentation/providers/video_generation_provider.dart';
 import '../widgets/student_bottom_nav.dart';
 
 class _Chapter {
@@ -34,7 +36,7 @@ const List<_Chapter> _genericChapters = <_Chapter>[
 ];
 
 /// Lists a subject's chapters, each leading to its lesson video.
-class ChapterListScreen extends StatelessWidget {
+class ChapterListScreen extends ConsumerWidget {
   /// Creates the chapter list screen for [medium], [grade], and [subject].
   const ChapterListScreen({super.key, required this.medium, required this.grade, required this.subject});
 
@@ -48,9 +50,20 @@ class ChapterListScreen extends StatelessWidget {
   final String subject;
 
   @override
-  Widget build(BuildContext context) {
-    final bool isScience = subject == 'science' && grade == '6';
-    final List<_Chapter> chapters = isScience ? _scienceGrade6Chapters : _genericChapters;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final jobs = ref.watch(recentJobsProvider).valueOrNull ?? const [];
+    final List<_Chapter> chapters = jobs
+        .where((job) =>
+            job.status == 'COMPLETED' &&
+            job.classLevel == grade &&
+            job.subject.toLowerCase() == subject.toLowerCase())
+        .map((job) => _Chapter(
+              id: job.taskId,
+              icon: Icons.play_lesson_rounded,
+              title: job.chapterTitle,
+              subtitle: 'AI-generated video lesson',
+            ))
+        .toList();
     final String gradeLabel = 'Grade $grade';
     final String subjectLabel = subject[0].toUpperCase() + subject.substring(1).replaceAll('-', ' ');
     return AppScaffold(

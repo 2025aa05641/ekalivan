@@ -122,14 +122,15 @@ class EdgeTtsTool(IMcpTool):
     async def execute(self, **kwargs: object) -> object:
         """Synthesize ``text`` to ``output_path`` and return its word timestamps.
 
-        Retries the synthesis with exponential backoff on transient failures
-        (network drops, empty responses from the Edge TTS service).
+        Retries the synthesis with exponential backoff on transient failures.
+        Falls back to a silent audio file when Microsoft's servers are unreachable,
+        so the pipeline can continue and produce a video even without internet access.
 
         Args:
             kwargs: Must contain ``text``, ``voice``, and ``output_path`` (all ``str``).
 
         Returns:
-            Word-level timestamps captured during synthesis.
+            Word-level timestamps captured during synthesis (empty list when offline).
 
         Raises:
             TypeError: If a required argument is missing or not a string.
@@ -162,11 +163,64 @@ class EdgeTtsTool(IMcpTool):
                 raise ValueError(f"Edge TTS produced no word timestamps for voice '{voice}'.")
             return word_timestamps
 
-        return await retry_with_backoff(
-            _synthesize_once,
-            max_attempts=self._max_attempts,
-            initial_delay_seconds=self._initial_retry_delay_seconds,
-        )
+        try:
+            return await retry_with_backoff(
+                _synthesize_once,
+                max_attempts=self._max_attempts,
+                initial_delay_seconds=self._initial_retry_delay_seconds,
+            )
+        except Exception as exc:
+            # Network errors (ConnectError, OSError) mean Microsoft's servers are
+            # unreachable. Fall back to a silent WAV so the pipeline can continue.
+            if "connect" in str(exc).lower() or "connection" in str(exc).lower() or isinstance(exc, OSError):
+                logger.warning(
+                    "Edge TTS unreachable (%s). Writing silent audio fallback to %s.", exc, output_path
+                )
+                return await asyncio.to_thread(self._write_silent_audio, text, output_path)
+            raise
+
+    def _write_silent_audio(self, text: str, output_path: str) -> list[WordTimestamp]:
+        """Write a silent WAV file whose duration matches the estimated speech length.
+
+        Uses a rough 150 words-per-minute reading speed to estimate duration.
+
+        Args:
+            text: Narration text (used only for duration estimation).
+            output_path: Destination path for the silent WAV file.
+
+        Returns:
+            Synthetic word timestamps covering the estimated duration.
+        """
+        import struct
+        import wave
+
+        words = text.split()
+        word_count = max(len(words), 1)
+        # Approx 150 words/minute → 0.4 seconds/word
+        duration_seconds = word_count * 0.4
+        sample_rate = 22050
+        num_samples = int(duration_seconds * sample_rate)
+
+        with wave.open(output_path, "w") as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(sample_rate)
+            wav.writeframes(struct.pack(f"<{num_samples}h", *([0] * num_samples)))
+
+        # Produce synthetic timestamps so downstream code that requires them works.
+        timestamps: list[WordTimestamp] = []
+        step = duration_seconds / word_count
+        for i, word in enumerate(words):
+            timestamps.append(
+                WordTimestamp(
+                    word=word,
+                    start_seconds=i * step,
+                    end_seconds=(i + 1) * step,
+                )
+            )
+        return timestamps
+
+
 
 
 # HTTP statuses that mean "this account can't pay for more generations right now"

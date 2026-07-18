@@ -77,6 +77,25 @@ class VideoJobRepository:
         await self._session.refresh(job)
         return job
 
+    async def update_progress_node(self, task_id: UUID, node: str) -> VideoJob | None:
+        """Update which pipeline node is currently executing.
+
+        Args:
+            task_id: Video-generation job UUID.
+            node: Human-readable stage name (e.g. "Lesson Planner").
+
+        Returns:
+            Updated job, or ``None`` when the job does not exist.
+        """
+        job = await self.get_job(task_id)
+        if job is None:
+            return None
+        job.progress_node = node
+        await self._session.commit()
+        await self._session.refresh(job)
+        return job
+
+
     async def mark_completed(
         self,
         task_id: UUID,

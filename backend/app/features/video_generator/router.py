@@ -68,9 +68,33 @@ async def run_video_generation_pipeline(
         job = await repository.update_status(task_id, VideoTaskStatus.PROCESSING)
         if job is None:
             return
+
+        async def _set_node(node: str) -> None:
+            """Persist the current pipeline stage name so polling clients see real progress."""
+            await repository.update_progress_node(task_id, node)
+
         try:
-            raw_result = await graph.ainvoke(VideoGenerationState(file_path=job.file_storage_path, task_id=str(job.id)))
-            result = VideoGenerationState.model_validate(raw_result)
+            # ``astream(..., updates)`` reports every completed LangGraph node.
+            # Persist the next node before it starts so polling clients see the
+            # real operation rather than an invented percentage-based stage.
+            stage_names = {
+                "parser": "Textbook Parsing",
+                "curriculum": "Curriculum Mapping",
+                "lesson_planning": "Lesson Planning",
+                "teacher": "Teacher Script",
+                "storyboard": "Storyboard",
+                "narration": "Narration (TTS)",
+                "video_rendering": "Video Rendering",
+                "publishing": "Publishing",
+            }
+            result = VideoGenerationState(file_path=job.file_storage_path, task_id=str(job.id))
+            await _set_node(stage_names["parser"])
+            async for update in graph.astream(result, config={"callbacks": []}, stream_mode="updates"):
+                for node_name, node_update in update.items():
+                    result = result.model_copy(update=node_update)
+                    if node_name != "publishing":
+                        node_order = list(stage_names)
+                        await _set_node(stage_names[node_order[node_order.index(node_name) + 1]])
         except Exception as exc:
             logger.exception("Video generation pipeline failed for job %s", task_id)
             await repository.mark_failed(task_id, str(exc) or f"{type(exc).__name__} (see server logs for details)")
@@ -236,9 +260,27 @@ async def get_video_job_status(
         [ScriptBeat.model_validate(beat) for beat in job.storyboard_beats] if job.storyboard_beats else None
     )
     narrated_beats = [NarratedBeat.model_validate(beat) for beat in job.narrated_beats] if job.narrated_beats else None
+    # Derive a descriptive progress_node from available fields when not explicitly stored.
+    progress_node = job.progress_node
+    if progress_node is None:
+        if job.video_url:
+            progress_node = "Final Publish"
+        elif job.output_video_path:
+            progress_node = "Publishing"
+        elif job.narrated_beats:
+            progress_node = "Video Rendering"
+        elif job.storyboard_beats:
+            progress_node = "Narration (TTS)"
+        elif job.sections:
+            progress_node = "Storyboard"
+        elif job.markdown_content:
+            progress_node = "Teacher"
+        elif job.status == "PROCESSING":
+            progress_node = "Lesson Planner"
     return JobStatusResponse(
         task_id=job.id,
         status=VideoTaskStatus(job.status),
+        progress_node=progress_node,
         markdown_content=job.markdown_content,
         sections=sections,
         storyboard_beats=storyboard_beats,

@@ -14,16 +14,16 @@ import '../../../video_generator/domain/entities/video_status_update_entity.dart
 import '../../../video_generator/presentation/providers/router_provider.dart';
 import '../../../video_generator/presentation/providers/video_generation_provider.dart';
 
-/// One named stage in the 8-step AI content-generation pipeline.
+/// One named stage in the backend's LangGraph content-generation pipeline.
 const List<String> pipelineStageNames = <String>[
+  'Textbook Parsing',
+  'Curriculum Mapping',
   'Lesson Planner',
-  'Teacher',
+  'Teacher Script',
   'Storyboard',
   'Narration (TTS)',
   'Video Rendering',
   'Publishing',
-  'Quality Check',
-  'Final Publish',
 ];
 
 /// Shows the 8-step AI pipeline for the job identified by [taskId].

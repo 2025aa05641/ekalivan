@@ -21,6 +21,7 @@ class VideoJob(Base):
     chapter_title: Mapped[str] = mapped_column(String(256), nullable=False)
     file_storage_path: Mapped[str] = mapped_column(String(512), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="QUEUED")
+    progress_node: Mapped[str | None] = mapped_column(String(64), nullable=True)
     markdown_content: Mapped[str | None] = mapped_column(Text(), nullable=True)
     sections: Mapped[list[dict[str, str]] | None] = mapped_column(JSON(), nullable=True)
     storyboard_beats: Mapped[list[dict[str, object]] | None] = mapped_column(JSON(), nullable=True)

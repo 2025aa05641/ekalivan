@@ -70,6 +70,7 @@ async def test_generate_and_read_job_status(client: AsyncClient, test_app: FastA
 
     completed_payload = await _await_generation_and_fetch_status(client, test_app, payload["task_id"])
     assert completed_payload["status"] == "COMPLETED"
+    assert completed_payload["progress_node"] == "Publishing"
     assert "Mock Markdown" in str(completed_payload["markdown_content"])
     assert completed_payload["sections"] == [{"title": "Mock Section", "content": "Mock content."}]
     assert completed_payload["storyboard_beats"] == [

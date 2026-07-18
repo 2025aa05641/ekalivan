@@ -74,7 +74,18 @@ class AdminDashboardScreen extends ConsumerWidget {
     final recentJobsAsync = ref.watch(recentJobsProvider);
     final myVideosAsync = ref.watch(myVideosProvider);
 
-    // Derive counts from real data where available, fall back to mock values.
+    final List<_RecentActivity> recentActivity = recentJobsAsync.valueOrNull
+            ?.map((job) => _RecentActivity(
+                  icon: _subjectIcon(job.subject),
+                  title: '${job.subject} Grade ${job.classLevel}',
+                  subtitle: job.chapterTitle,
+                  status: _statusKind(job.status),
+                  taskId: job.taskId,
+                ))
+            .toList() ??
+        const <_RecentActivity>[];
+
+    // All metrics come from persisted backend jobs. Zero means no uploads yet.
     final int realJobCount = recentJobsAsync.valueOrNull?.length ?? 0;
     final int processingCount = recentJobsAsync.valueOrNull
             ?.where((j) => j.status == 'PROCESSING' || j.status == 'QUEUED')
@@ -82,9 +93,9 @@ class AdminDashboardScreen extends ConsumerWidget {
         0;
     final int publishedCount = myVideosAsync.valueOrNull?.length ?? 0;
 
-    final int totalBooksCount = realJobCount > 0 ? realJobCount : 24;
-    final int totalVideosCount = publishedCount > 0 ? publishedCount : 156;
-    final int processingFinal = processingCount > 0 ? processingCount : 8;
+    final int totalBooksCount = realJobCount;
+    final int totalVideosCount = publishedCount;
+    final int processingFinal = processingCount;
 
     return AppScaffold(
       appBar: AppBar(
@@ -134,9 +145,15 @@ class AdminDashboardScreen extends ConsumerWidget {
             padding: EdgeInsets.zero,
             child: Column(
               children: <Widget>[
-                for (int i = 0; i < _recentActivity.length; i++) ...<Widget>[
-                  _RecentActivityTile(activity: _recentActivity[i]),
-                  if (i < _recentActivity.length - 1)
+                if (recentActivity.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Text('No uploads yet. Upload a textbook to start creating a lesson.'),
+                  )
+                else
+                  for (int i = 0; i < recentActivity.length; i++) ...<Widget>[
+                  _RecentActivityTile(activity: recentActivity[i]),
+                  if (i < recentActivity.length - 1)
                     const Divider(height: 1, indent: 16, endIndent: 16),
                 ],
               ],
@@ -207,6 +224,21 @@ class _MetricCard extends StatelessWidget {
   }
 }
 
+IconData _subjectIcon(String subject) {
+  final String value = subject.toLowerCase();
+  if (value.contains('science')) return Icons.eco_rounded;
+  if (value.contains('math')) return Icons.calculate_rounded;
+  if (value.contains('tamil') || value.contains('english')) return Icons.translate_rounded;
+  return Icons.public_rounded;
+}
+
+StatusChipKind _statusKind(String status) => switch (status) {
+      'COMPLETED' => StatusChipKind.success,
+      'PROCESSING' => StatusChipKind.inProgress,
+      'FAILED' => StatusChipKind.danger,
+      _ => StatusChipKind.neutral,
+    };
+
 class _RecentActivityTile extends StatelessWidget {
   const _RecentActivityTile({required this.activity});
 
@@ -221,7 +253,10 @@ class _RecentActivityTile extends StatelessWidget {
       StatusChipKind.danger => 'Failed',
     };
     return InkWell(
-      onTap: () => context.goNamed(AppRoute.adminPipelines.routeName),
+      onTap: () => context.goNamed(
+        AppRoute.adminPipeline.routeName,
+        pathParameters: <String, String>{'taskId': activity.taskId},
+      ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(

@@ -70,8 +70,9 @@ class ChapterDetailScreen extends ConsumerWidget {
     // 1. Check local offline cache first.
     final List<VideoJobEntity> cached = await ref.read(videoRepositoryProvider).getOfflineCachedVideos();
     if (!context.mounted) return;
-    if (cached.isNotEmpty) {
-      context.pushNamed(AppRoute.cachedVideo.routeName, extra: cached.first);
+    final VideoJobEntity? cachedLesson = cached.where((VideoJobEntity job) => job.taskId == chapterId).firstOrNull;
+    if (cachedLesson != null) {
+      context.pushNamed(AppRoute.cachedVideo.routeName, extra: cachedLesson);
       return;
     }
 
@@ -84,13 +85,14 @@ class ChapterDetailScreen extends ConsumerWidget {
       matchingJob = recentJobs.firstWhere(
         (RecentJobEntity j) =>
             j.status == 'COMPLETED' &&
-            j.classLevel == grade &&
-            j.subject.toLowerCase() == subject.toLowerCase(),
+            j.taskId == chapterId,
       );
     } catch (_) {
       // No exact match — try any completed job.
       try {
-        matchingJob = recentJobs.firstWhere((RecentJobEntity j) => j.status == 'COMPLETED');
+        matchingJob = recentJobs.firstWhere(
+          (RecentJobEntity j) => j.status == 'COMPLETED' && j.taskId == chapterId,
+        );
       } catch (_) {
         matchingJob = null;
       }

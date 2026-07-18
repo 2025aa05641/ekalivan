@@ -99,11 +99,6 @@ class AdminPipelinesScreen extends ConsumerWidget {
       orElse: () => const <_PipelineJob>[],
     );
 
-    final List<_PipelineJob> allJobs = <_PipelineJob>[
-      ...realJobs,
-      ..._jobs,
-    ];
-
     return AppScaffold(
       appBar: AppBar(
         title: const Text('Pipelines'),
@@ -120,9 +115,15 @@ class AdminPipelinesScreen extends ConsumerWidget {
             padding: EdgeInsets.zero,
             child: Column(
               children: <Widget>[
-                for (int i = 0; i < allJobs.length; i++) ...<Widget>[
-                  _PipelineJobTile(job: allJobs[i]),
-                  if (i < allJobs.length - 1) const Divider(height: 1, indent: 16, endIndent: 16),
+                if (realJobs.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Text('No pipelines yet. Upload a textbook to create one.'),
+                  )
+                else
+                  for (int i = 0; i < realJobs.length; i++) ...<Widget>[
+                  _PipelineJobTile(job: realJobs[i]),
+                  if (i < realJobs.length - 1) const Divider(height: 1, indent: 16, endIndent: 16),
                 ],
               ],
             ),
