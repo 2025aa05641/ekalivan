@@ -4,7 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:file_selector/file_selector.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -25,7 +25,8 @@ class UploadBookScreen extends ConsumerStatefulWidget {
 }
 
 class _UploadBookScreenState extends ConsumerState<UploadBookScreen> {
-  PlatformFile? _selectedFile;
+  XFile? _selectedFile;
+  int _selectedFileSize = 0;
   String _medium = 'English';
   String _grade = 'Grade 6';
   String _subject = 'Science';
@@ -59,8 +60,9 @@ class _UploadBookScreenState extends ConsumerState<UploadBookScreen> {
     
     try {
       // 1. Upload file to backend
+      final bytes = await _selectedFile!.readAsBytes();
       final String fileStoragePath = await ref.read(videoRepositoryProvider).uploadVideoSource(
-        bytes: _selectedFile!.bytes!,
+        bytes: bytes,
         filename: _selectedFile!.name,
       );
 
@@ -117,13 +119,17 @@ class _UploadBookScreenState extends ConsumerState<UploadBookScreen> {
           _DottedDropZone(
             hasFile: _selectedFile != null,
             onChooseFile: () async {
-              final result = await FilePicker.pickFiles(
-                type: FileType.custom,
-                allowedExtensions: ['pdf'],
-                withData: true,
+              const XTypeGroup typeGroup = XTypeGroup(
+                label: 'PDFs',
+                extensions: <String>['pdf'],
               );
-              if (result != null && result.files.isNotEmpty) {
-                setState(() => _selectedFile = result.files.first);
+              final XFile? file = await openFile(acceptedTypeGroups: <XTypeGroup>[typeGroup]);
+              if (file != null) {
+                final int size = await file.length();
+                setState(() {
+                  _selectedFile = file;
+                  _selectedFileSize = size;
+                });
               }
             },
           ),
@@ -158,9 +164,9 @@ class _UploadBookScreenState extends ConsumerState<UploadBookScreen> {
                           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                         ),
                         Text(
-                          _selectedFile!.size < 1024 * 1024 
-                              ? '${(_selectedFile!.size / 1024).toStringAsFixed(1)} KB'
-                              : '${(_selectedFile!.size / (1024 * 1024)).toStringAsFixed(1)} MB',
+                          _selectedFileSize < 1024 * 1024 
+                              ? '${(_selectedFileSize / 1024).toStringAsFixed(1)} KB'
+                              : '${(_selectedFileSize / (1024 * 1024)).toStringAsFixed(1)} MB',
                           style: const TextStyle(color: Colors.grey, fontSize: 12),
                         ),
                       ],

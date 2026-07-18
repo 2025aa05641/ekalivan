@@ -69,12 +69,7 @@ class _RenderingBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (update.status == 'FAILED') {
-      return Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: AccessibleErrorWidget(message: update.errorMessage ?? 'The video could not be rendered.'),
-      );
-    }
+    final bool isFailed = update.status == 'FAILED';
 
     // Simulated stats for mockup
     const String estimatedTime = '00:03:45';
@@ -131,8 +126,10 @@ class _RenderingBody extends StatelessWidget {
                     child: Container(
                       height: 10,
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppColors.primaryBlue, AppColors.primaryPurple],
+                        gradient: LinearGradient(
+                          colors: isFailed
+                              ? [Colors.red.shade400, Colors.red.shade600]
+                              : [AppColors.primaryBlue, AppColors.primaryPurple],
                         ),
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -144,10 +141,10 @@ class _RenderingBody extends StatelessWidget {
               Align(
                 alignment: Alignment.centerRight,
                 child: Text(
-                  '${update.progress.round()}%',
-                  style: const TextStyle(
+                  isFailed ? 'Failed' : '${update.progress.round()}%',
+                  style: TextStyle(
                     fontWeight: FontWeight.w700,
-                    color: AppColors.primaryBlue,
+                    color: isFailed ? Colors.red : AppColors.primaryBlue,
                     fontSize: 13,
                   ),
                 ),
@@ -168,18 +165,26 @@ class _RenderingBody extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: AppColors.primaryBlue.withValues(alpha: 0.06),
+            color: isFailed ? Colors.red.withValues(alpha: 0.06) : AppColors.primaryBlue.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.primaryBlue.withValues(alpha: 0.2)),
+            border: Border.all(
+              color: isFailed ? Colors.red.withValues(alpha: 0.2) : AppColors.primaryBlue.withValues(alpha: 0.2),
+            ),
           ),
-          child: const Row(
+          child: Row(
             children: [
-              Icon(Icons.notifications_active_outlined, color: AppColors.primaryBlue, size: 18),
-              SizedBox(width: 10),
+              Icon(
+                isFailed ? Icons.error_outline_rounded : Icons.notifications_active_outlined,
+                color: isFailed ? Colors.red : AppColors.primaryBlue,
+                size: 18,
+              ),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'You will be notified once the video is ready.',
-                  style: TextStyle(color: AppColors.primaryBlue, fontSize: 13),
+                  isFailed
+                      ? (update.errorMessage ?? 'Video rendering failed unexpectedly.')
+                      : 'You will be notified once the video is ready.',
+                  style: TextStyle(color: isFailed ? Colors.red : AppColors.primaryBlue, fontSize: 13),
                 ),
               ),
             ],

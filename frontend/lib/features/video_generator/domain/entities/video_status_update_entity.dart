@@ -8,11 +8,15 @@ class VideoStatusUpdateEntity {
     required this.progress,
     required this.currentNode,
     required this.status,
+    this.markdownContent,
+    this.sections,
+    this.storyboardBeats,
+    this.narratedBeats,
     this.videoUrl,
     this.errorMessage,
   });
 
-  /// Completion percentage.
+  /// Completion percentage (0–100).
   final double progress;
 
   /// Plain-language current stage, shown in place of a technical status code.
@@ -20,6 +24,18 @@ class VideoStatusUpdateEntity {
 
   /// Current lifecycle state (`QUEUED`, `PROCESSING`, `COMPLETED`, or `FAILED`).
   final String status;
+
+  /// Markdown produced by the Parser (Lesson Planner) stage.
+  final String? markdownContent;
+
+  /// Structured sections produced by the Teacher stage.
+  final List<Map<String, Object?>>? sections;
+
+  /// Storyboard beats produced by the Storyboard stage.
+  final List<Map<String, Object?>>? storyboardBeats;
+
+  /// Narrated beats produced by the Narration (TTS) stage.
+  final List<Map<String, Object?>>? narratedBeats;
 
   /// Servable video URL, present once [status] is `COMPLETED`.
   final String? videoUrl;
