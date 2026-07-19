@@ -22,11 +22,14 @@ Ekalivan turns a static government-school textbook chapter into a short, localiz
 - [`Executive_Architecture_Design_Document (1).md`](Executive_Architecture_Design_Document%20%281%29.md) / [`Executive_Architecture_Design_Document.pdf`](Executive_Architecture_Design_Document.pdf) — full architecture design document.
 - [`Final_Demo/`](Final_Demo/) — final demo deliverables: the narrated slide video (`Ekalivan_Slides_Narrated.mp4`), the slide deck (`Ekalaivan_FinalDemo.pptx`), and a full walkthrough recording (`final_demo.mp4`).
 
+  
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/ef2cb127-f59c-4047-9de6-04b4af99cfa9" />
+
+
 ## Architecture
 
 - `backend/`: Python 3.12 FastAPI API gateway. Routes accept work quickly, background execution owns long-running work, and interfaces isolate LangGraph, LLM providers, and MCP tools.
 - `frontend/`: Flutter client using feature-first Clean Architecture, Riverpod for observed async state, Dio for networking, and GoRouter named routes. It splits into a **Creator Portal** (login, dashboard, upload book, pipeline/rendering progress, publish, libraries) and a **Student Portal** (splash, medium/class/subject selection, chapter list, chapter detail with video playback, downloads, profile).
-- `mcp_demo/`: Existing exploratory notebook; it is not part of the production application.
 - `Final_Demo/`: Final demo deliverables — see Documentation & Demo above.
 
 The system is a working end-to-end product: a Creator can upload a PDF, watch it move through an 8-stage AI pipeline (Parser/Intake → Curriculum → Lesson Planning → Teacher → Storyboard → Narration/TTS → Video Rendering → Publishing), and publish a real streamable MP4; a Student can pick a medium, class, and subject and watch the resulting lesson. Every LLM-backed stage runs through a single `ILlmProvider` interface against a local Ollama server (with optional fallback chaining), narration audio and word-level timestamps come from Edge TTS, and rendering composites the result into one streaming-ready MP4 via MoviePy and FFmpeg — with a pluggable clip source (`local`, Google Veo 3, or pre-generated Kaggle clips) for the video's visuals.
