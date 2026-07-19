@@ -14,14 +14,20 @@ An AI-powered personalized learning platform that empowers every learner through
 
 Built with ❤️ by **Team 4NLPians** for the **Build in AI for India Hackathon** — shortlisted in the competition.
 
-Ekalivan turns a static government-school textbook chapter into a short, localized, animated video lesson — automatically, using AI once at content-creation time and never again at playback time. A **Creator** (teacher/publisher) uploads a chapter PDF once; every **Student** afterwards streams the finished video for free, with zero further AI cost. See [`Final_Demo/`](Final_Demo/) for the narrated walkthrough video and slide deck, and `APP_FUNCTIONALITY_AND_EXECUTIVE_SUMMARY.md` for the full product write-up.
+Ekalivan turns a static government-school textbook chapter into a short, localized, animated video lesson — automatically, using AI once at content-creation time and never again at playback time. A **Creator** (teacher/publisher) uploads a chapter PDF once; every **Student** afterwards streams the finished video for free, with zero further AI cost.
+
+## Documentation & Demo
+
+- [`APP_FUNCTIONALITY_AND_EXECUTIVE_SUMMARY.md`](APP_FUNCTIONALITY_AND_EXECUTIVE_SUMMARY.md) / [`.pdf`](APP_FUNCTIONALITY_AND_EXECUTIVE_SUMMARY.pdf) — product overview: problem, personas, pipeline, tech stack.
+- [`Executive_Architecture_Design_Document (1).md`](Executive_Architecture_Design_Document%20%281%29.md) / [`Executive_Architecture_Design_Document.pdf`](Executive_Architecture_Design_Document.pdf) — full architecture design document.
+- [`Final_Demo/`](Final_Demo/) — final demo deliverables: the narrated slide video (`Ekalivan_Slides_Narrated.mp4`), the slide deck (`Ekalaivan_FinalDemo.pptx`), and a full walkthrough recording (`final_demo.mp4`).
 
 ## Architecture
 
 - `backend/`: Python 3.12 FastAPI API gateway. Routes accept work quickly, background execution owns long-running work, and interfaces isolate LangGraph, LLM providers, and MCP tools.
 - `frontend/`: Flutter client using feature-first Clean Architecture, Riverpod for observed async state, Dio for networking, and GoRouter named routes. It splits into a **Creator Portal** (login, dashboard, upload book, pipeline/rendering progress, publish, libraries) and a **Student Portal** (splash, medium/class/subject selection, chapter list, chapter detail with video playback, downloads, profile).
 - `mcp_demo/`: Existing exploratory notebook; it is not part of the production application.
-- `Final_Demo/`: Final demo deliverables — narrated slide video and slide deck.
+- `Final_Demo/`: Final demo deliverables — see Documentation & Demo above.
 
 The system is a working end-to-end product: a Creator can upload a PDF, watch it move through an 8-stage AI pipeline (Parser/Intake → Curriculum → Lesson Planning → Teacher → Storyboard → Narration/TTS → Video Rendering → Publishing), and publish a real streamable MP4; a Student can pick a medium, class, and subject and watch the resulting lesson. Every LLM-backed stage runs through a single `ILlmProvider` interface against a local Ollama server (with optional fallback chaining), narration audio and word-level timestamps come from Edge TTS, and rendering composites the result into one streaming-ready MP4 via MoviePy and FFmpeg — with a pluggable clip source (`local`, Google Veo 3, or pre-generated Kaggle clips) for the video's visuals.
 
