@@ -28,6 +28,7 @@ uploads/
 *.mp4
 # ...except the dissertation deliverable videos, which are tracked on purpose.
 !/textbook-to-video-output/**/*.mp4
+!/Final_Demo/**/*.mp4
 
 # IDE and OS
 .DS_Store
